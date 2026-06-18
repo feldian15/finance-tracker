@@ -491,7 +491,7 @@ def exchange_public_token(body: PublicTokenRequest, db: Session = Depends(get_db
         plaid_item = models.PlaidItem(
             id=str(uuid.uuid4()),
             item_id=item_id,
-            access_token=access_token,
+            access_token=services.encrypt_token(access_token),
         )
         db.add(plaid_item)
         db.commit()
@@ -525,7 +525,7 @@ def sync_transactions(item_id: str, db: Session = Depends(get_db)):
     if not plaid_item:
         raise HTTPException(status_code=404, detail="PlaidItem not found")
     
-    result = services.sync_transactions(plaid_item.access_token, plaid_item.cursor)
+    result = services.sync_transactions(services.decrypt_token(plaid_item.access_token), plaid_item.cursor)
 
     rows = result["added"]
 

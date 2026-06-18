@@ -20,6 +20,7 @@ from plaid.model.item_public_token_exchange_request import ItemPublicTokenExchan
 from plaid.model.accounts_get_request import AccountsGetRequest
 from plaid.model.transactions_sync_request import TransactionsSyncRequest
 from dotenv import load_dotenv
+from cryptography.fernet import Fernet
 
 load_dotenv()
 
@@ -44,6 +45,9 @@ CREDIT_TYPES = ["credit", "deposit", "payment"]
 PLAID_CLIENT_ID = os.getenv("PLAID_CLIENT_ID")
 PLAID_SECRET = os.getenv("PLAID_SECRET")
 PLAID_ENV = os.getenv("PLAID_ENV", "sandbox")
+PLAID_TOKEN_ENCRYPTION_KEY = os.getenv("PLAID_TOKEN_ENCRYPTION_KEY")
+
+fernet = Fernet(PLAID_TOKEN_ENCRYPTION_KEY)
 
 host_map = {
     "sandbox": plaid.Environment.Sandbox,
@@ -61,6 +65,12 @@ configuration = plaid.Configuration(
 api_client = plaid.ApiClient(configuration)
 client = plaid_api.PlaidApi(api_client)
 
+def encrypt_token(token: str) -> str:
+    return fernet.encrypt(token.encode()).decode()
+
+
+def decrypt_token(encrypted_token: str) -> str:
+    return fernet.decrypt(encrypted_token.encode()).decode()
 
 def create_link_token() -> str:
     """Ask Plaid for short lived link token tied to this user"""
