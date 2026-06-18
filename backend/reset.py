@@ -26,8 +26,10 @@ from sqlalchemy import text
 #     """))
 
 db = SessionLocal()
+db.query(models.Transaction).delete()
 
-accs = db.query(models.PlaidItem).delete()
+
+
 db.commit()
 
 # # --- Create test account ---

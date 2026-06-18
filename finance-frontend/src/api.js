@@ -535,3 +535,16 @@ export async function createUpdateLinkToken(itemId) {
 
     return response.json()
 }
+
+
+export async function resetCursor(itemId) {
+  const response = await fetch(`${API_BASE}/api/reset_cursor/${itemId}`, {
+    method: "POST",
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to reset cursor");
+  }
+
+  return response.json();
+}

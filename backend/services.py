@@ -19,6 +19,7 @@ from plaid.model.country_code import CountryCode
 from plaid.model.item_public_token_exchange_request import ItemPublicTokenExchangeRequest
 from plaid.model.accounts_get_request import AccountsGetRequest
 from plaid.model.transactions_sync_request import TransactionsSyncRequest
+from plaid.model.item_remove_request import ItemRemoveRequest
 from dotenv import load_dotenv
 from cryptography.fernet import Fernet
 
@@ -71,6 +72,13 @@ def encrypt_token(token: str) -> str:
 
 def decrypt_token(encrypted_token: str) -> str:
     return fernet.decrypt(encrypted_token.encode()).decode()
+
+
+def remove_item(access_token: str):
+    """Properly severs the connection on Plaid's side. Without this, the
+    Item stays live on Plaid's end even if you delete your local DB rows."""
+    request = ItemRemoveRequest(access_token=access_token)
+    client.item_remove(request)
 
 
 def create_link_token() -> str:
@@ -232,10 +240,10 @@ def import_transactions_from_plaid(rows, db):
             continue
 
     return {
-        "transactions_created": created, 
-        "duplicate_transactions_skipped": len(duplicates), 
-        "invalid_transactions": error,
-        "duplicate_transaction_list": duplicates
+        "created": created, 
+        "dups": len(duplicates), 
+        "errors": error,
+        "dup_list": duplicates
     }
 
 

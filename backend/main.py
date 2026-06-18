@@ -549,9 +549,26 @@ def sync_transactions(item_id: str, db: Session = Depends(get_db)):
     plaid_item = db.query(models.PlaidItem).filter(models.PlaidItem.id == item_id).first()
     if not plaid_item:
         raise HTTPException(status_code=404, detail="PlaidItem not found")
+
+    total_added = 0
+    total_duplicates = 0
+    total_errors = 0
+    has_more = True
     
     try: 
-        result = services.sync_transactions(services.decrypt_token(plaid_item.access_token), plaid_item.cursor)
+        while has_more:
+            result = services.sync_transactions(services.decrypt_token(plaid_item.access_token), plaid_item.cursor)
+            
+            created = services.import_transactions_from_plaid(result["added"], db)
+            total_added += created["created"]
+            total_duplicates += created["dups"]
+            total_errors += created["errors"]
+
+            plaid_item.cursor = result["next_cursor"]
+            db.commit()
+
+            has_more = result["has_more"]
+            
     except ApiException as e:
         error_body = json.loads(e.body)
         if error_body.get("error_code") == "ITEM_LOGIN_REQUIRED":
@@ -564,15 +581,50 @@ def sync_transactions(item_id: str, db: Session = Depends(get_db)):
             )
         raise HTTPException(status_code=500, detail=error_body.get("error_message", "Plaid error"))
 
-    rows = result["added"]
-
-    created = services.import_transactions_from_plaid(rows, db)
-
-    db.commit()
-
-    return created
+    return {
+        "transactions_created": total_added,
+        "duplicate_transactions_skipped": total_duplicates,
+        "invalid_transactions": total_errors
+    }
 
 
 @app.get("/plaid_items", response_model=list[PlaidItemOut])
 def get_accounts(db: Session = Depends(get_db)):
     return db.query(models.PlaidItem).all()
+
+
+@app.delete("/api/plaid_items/{item_id}")
+def delete_plaid_item(item_id: str, db: Session = Depends(get_db)):
+    plaid_item = db.query(models.PlaidItem).filter(models.PlaidItem.id == item_id).first()
+    if not plaid_item:
+        raise HTTPException(status_code=404, detail="PlaidItem not found")
+
+    # Remove on Plaid's side first
+    try:
+        services.remove_item(services.decrypt_token(plaid_item.access_token))
+    except ApiException as e:
+        error_body = json.loads(e.body)
+        # If Plaid already considers it gone, don't block local cleanup
+        if error_body.get("error_code") != "ITEM_NOT_FOUND":
+            raise HTTPException(status_code=500, detail=error_body.get("error_message", "Plaid error"))
+
+    # Delete local accounts and transactions tied to this item
+    account_ids = [a.id for a in db.query(models.Account).filter(models.Account.plaid_item_id == plaid_item.id)]
+    db.query(models.Transaction).filter(models.Transaction.account_id.in_(account_ids)).delete(synchronize_session=False)
+    db.query(models.Account).filter(models.Account.plaid_item_id == plaid_item.id).delete(synchronize_session=False)
+    db.delete(plaid_item)
+    db.commit()
+
+    return {"status": "deleted", "item_id": item_id}
+
+
+@app.post("/api/reset_cursor/{item_id}")
+def reset_cursor(item_id: str, db: Session = Depends(get_db)):
+    plaid_item = db.query(models.PlaidItem).filter(models.PlaidItem.id == item_id).first()
+    if not plaid_item:
+        raise HTTPException(status_code=404, detail="PlaidItem not found")
+
+    plaid_item.cursor = None
+    db.commit()
+
+    return {"status": "cursor reset", "item_id": item_id}

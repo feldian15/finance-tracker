@@ -1,7 +1,8 @@
-import { createAccount, deleteAccount, updateAccount, createLinkToken, exchangePublicToken, fetchAccounts, syncTransactions, createUpdateLinkToken } from "../../api"
+import { createAccount, deleteAccount, updateAccount, createLinkToken, exchangePublicToken, fetchAccounts, syncTransactions, createUpdateLinkToken, resetCursor } from "../../api"
 import { useState, useEffect, useCallback } from "react"
 import { usePlaidLink } from "react-plaid-link"
 import toast from "react-hot-toast"
+
 
 function AccountsSection({
     newAccount,
@@ -323,6 +324,19 @@ function AccountsSection({
                                     {acc.plaid_item_id && (
                                         <button onClick={() => handleSync(acc)}>
                                             Sync transactions
+                                        </button>
+                                        )}
+                                </td>
+                                <td>
+                                    {acc.plaid_item_id && (
+                                        <button
+                                            onClick={async () => {
+                                            if (!window.confirm("This will re-pull this bank's full transaction history. Continue?")) return;
+                                            await resetCursor(acc.plaid_item_id);
+                                            toast.success("Cursor reset — click Sync to pull full history");
+                                            }}
+                                        >
+                                            Reset & resync
                                         </button>
                                         )}
                                 </td>
