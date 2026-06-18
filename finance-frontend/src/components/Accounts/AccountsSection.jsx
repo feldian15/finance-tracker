@@ -1,4 +1,4 @@
-import { createAccount, deleteAccount, updateAccount, createLinkToken, exchangePublicToken, fetchAccounts, syncTransactions } from "../../api"
+import { createAccount, deleteAccount, updateAccount, createLinkToken, exchangePublicToken, fetchAccounts, syncTransactions, createUpdateLinkToken } from "../../api"
 import { useState, useEffect, useCallback } from "react"
 import { usePlaidLink } from "react-plaid-link"
 import toast from "react-hot-toast"
@@ -25,6 +25,8 @@ function AccountsSection({
     })
 
     const [linkToken, setLinkToken] = useState(null)
+    const [updateLinkToken, setUpdateLinkToken] = useState(null)
+    const [reconnectItemId, setReconnectItemId] = useState(null)
 
     useEffect(() => {
         createLinkToken()
@@ -36,14 +38,58 @@ function AccountsSection({
         async (publicToken) => {
         await exchangePublicToken(publicToken);
         await loadAccounts();
+        toast.success("Bank connected successfully")
         },
         [loadAccounts]
     );
 
-    const { open, ready } = usePlaidLink({
+    const onUpdateSuccess = useCallback(
+        async () => {
+            setUpdateLinkToken(null),
+            setReconnectItemId(null),
+            toast.success("Bank reconnected successfully")
+        },
+        []
+    )
+
+    const { open: openLink, ready: linkReady } = usePlaidLink({
         token: linkToken,
         onSuccess: onPlaidSuccess,
     })
+
+    const { open: openUpdateLink, ready: updateReady } = usePlaidLink({
+        token: updateLinkToken,
+        onSuccess: onUpdateSuccess
+    })
+
+
+    useEffect(() => {
+        if (updateReady && updateLinkToken) {
+            openUpdateLink()
+        }
+    }, [updateReady, updateLinkToken, openUpdateLink])
+
+
+    const handleSync = async (account) => {
+        try {
+            const result = await syncTransactions(account.plaid_item_id)
+            await loadTransactions()
+            toast.success(
+                `Added ${result.transactions_created}, duplicates ${result.duplicate_transactions_skipped}, errors ${result.invalid_transactions}`
+            )
+        } catch (err) {
+            if (err.detail?.error_code === "ITEM_LOGIN_REQUIRED") {
+                toast.error("This bank needs to be reconnected. Opening link...")
+                const { link_token } = await createUpdateLinkToken(err.detail.item_id)
+                setReconnectItemId(err.detail.item_id)
+                setUpdateLinkToken(link_token)
+            } else {
+                toast.error("Sync failed. Check console for details.")
+                console.error(err)
+            }
+        }
+    }
+
 
     function startEditAccount(acc) {
 
@@ -144,7 +190,7 @@ function AccountsSection({
 
 
             <h2>Connenct a Bank Automatically</h2>
-            <button onClick={() => open()} disabled={!ready}>
+            <button onClick={() => openLink()} disabled={!linkReady}>
                 Connect a bank
             </button>
 
@@ -275,15 +321,7 @@ function AccountsSection({
                                 </td>
                                 <td>
                                     {acc.plaid_item_id && (
-                                        <button
-                                            onClick={async () => {
-                                                const result = await syncTransactions(acc.plaid_item_id);
-                                                await loadTransactions();
-                                                toast.success(
-                                                    `Added ${result.transactions_created}, duplicates ${result.duplicate_transactions_skipped}, errors ${result.invalid_transactions}`
-                                                )
-                                            }}
-                                        >
+                                        <button onClick={() => handleSync(acc)}>
                                             Sync transactions
                                         </button>
                                         )}

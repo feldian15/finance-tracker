@@ -72,6 +72,7 @@ def encrypt_token(token: str) -> str:
 def decrypt_token(encrypted_token: str) -> str:
     return fernet.decrypt(encrypted_token.encode()).decode()
 
+
 def create_link_token() -> str:
     """Ask Plaid for short lived link token tied to this user"""
     request = LinkTokenCreateRequest(
@@ -80,6 +81,20 @@ def create_link_token() -> str:
         country_codes=[CountryCode("US")],
         language="en",
         user=LinkTokenCreateRequestUser(client_user_id="local-user"),
+    )
+
+    response = client.link_token_create(request)
+    return response.link_token
+
+
+def create_update_link_token(access_token: str) -> str:
+    # Create link token in update mode
+    request = LinkTokenCreateRequest(
+        client_name="finance-tracker",
+        country_codes=[CountryCode("US")],
+        language="en",
+        user=LinkTokenCreateRequestUser(client_user_id="local-user"),
+        access_token=access_token
     )
 
     response = client.link_token_create(request)
@@ -117,6 +132,15 @@ def create_sandbox_public_token() -> str:
     return response.public_token
 
 
+from plaid.model.sandbox_item_reset_login_request import SandboxItemResetLoginRequest
+
+def force_item_login_required(access_token: str):
+    """SANDBOX ONLY. Forces an item into the login-required state so we
+    can test the update-mode reconnect flow."""
+    request = SandboxItemResetLoginRequest(access_token=access_token)
+    client.sandbox_item_reset_login(request)
+
+
 # ----------------------------------#
 
 
@@ -147,7 +171,7 @@ def import_transactions_from_plaid(rows, db):
     duplicates = []
 
     rules = db.query(models.CategoryRule).all()
-
+    
     for txn in rows:
         try:
             # Get the account id associated with the plaid account id

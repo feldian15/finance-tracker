@@ -13,6 +13,8 @@ import uuid
 import csv
 import io
 from pydantic import BaseModel
+import json
+from plaid.exceptions import ApiException
 
 
 models.Base.metadata.create_all(bind=engine)
@@ -476,6 +478,17 @@ def create_link_token():
     return {"link_token": link_token}
 
 
+@app.get("/api/create_update_link_token/{item_id}")
+def create_update_link_token(item_id: str, db: Session = Depends(get_db)):
+    plaid_item = db.query(models.PlaidItem).filter(models.PlaidItem.id == item_id).first()
+
+    if not plaid_item:
+        raise HTTPException(status_code=404, detail="Plaid Item not found")
+    
+    link_token = services.create_update_link_token(services.decrypt_token(plaid_item.access_token))
+    return {"link_token": link_token}
+
+
 @app.post("/api/exchange_public_token")
 def exchange_public_token(body: PublicTokenRequest, db: Session = Depends(get_db)):
     # first exchange the public token for permanent access token
@@ -497,7 +510,7 @@ def exchange_public_token(body: PublicTokenRequest, db: Session = Depends(get_db
         db.commit()
         db.refresh(plaid_item)
 
-    # TEMP for TESTING Fetch accounts for this item and save them
+    # Fetch accounts for this item and save them
     accounts = services.get_accounts_for_item(access_token)
 
     for acct in accounts:
@@ -513,10 +526,22 @@ def exchange_public_token(body: PublicTokenRequest, db: Session = Depends(get_db
     return {"status": "success", "item_id": item_id, "accounts_linked": len(accounts)}
 
 
+# --------- Sandbox Testing ----------------
 @app.get("/api/sandbox/create_public_token")
 def sandbox_create_public_token():
     public_token = services.create_sandbox_public_token()
     return {"public_token": public_token}
+
+
+@app.post("/api/sandbox/force_login_required/{item_id}")
+def sandbox_force_login_required(item_id: str, db: Session = Depends(get_db)):
+    plaid_item = db.query(models.PlaidItem).filter(models.PlaidItem.id == item_id).first()
+    if not plaid_item:
+        raise HTTPException(status_code=404, detail=f"PlaidItem not found: {item_id}")
+    services.force_item_login_required(services.decrypt_token(plaid_item.access_token))
+    return {"status": "forced"}
+
+# ------------------------
 
 
 @app.post("/api/sync_transactions/{item_id}")
@@ -525,7 +550,19 @@ def sync_transactions(item_id: str, db: Session = Depends(get_db)):
     if not plaid_item:
         raise HTTPException(status_code=404, detail="PlaidItem not found")
     
-    result = services.sync_transactions(services.decrypt_token(plaid_item.access_token), plaid_item.cursor)
+    try: 
+        result = services.sync_transactions(services.decrypt_token(plaid_item.access_token), plaid_item.cursor)
+    except ApiException as e:
+        error_body = json.loads(e.body)
+        if error_body.get("error_code") == "ITEM_LOGIN_REQUIRED":
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "error_code": "ITEM_LOGIN_REQUIRED",
+                    "item_id": plaid_item.id
+                }
+            )
+        raise HTTPException(status_code=500, detail=error_body.get("error_message", "Plaid error"))
 
     rows = result["added"]
 

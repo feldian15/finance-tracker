@@ -516,7 +516,21 @@ export async function syncTransactions(itemId) {
     })
 
     if (!response.ok) {
-        throw new Error("Failed to sync transactions")
+        const errorBody = await response.json()
+        const err = new Error(errorBody?.detail?.error_code || "Failed to sync transactions")
+        err.detail = errorBody.detail
+        throw err
+    }
+
+    return response.json()
+}
+
+
+export async function createUpdateLinkToken(itemId) {
+    const response = await fetch(`${API_BASE}/api/create_update_link_token/${itemId}`)
+
+    if (!response.ok) {
+        throw new Error("Failed to create update link token")
     }
 
     return response.json()
