@@ -26,11 +26,38 @@ from sqlalchemy import text
 #     """))
 
 db = SessionLocal()
-db.query(models.Transaction).delete()
+
+query = db.query(models.Transaction).join(models.Account).filter(models.Account.name == 'Chase', models.Transaction.date < '2026-06-29').all()
+
+query.sort(key=lambda tx: (tx.date, tx.amount), reverse=False)
+
+# l = [q.amount for q in query]
+
+# import csv
+
+# output_file = "output.csv"
+
+# with open(output_file, "w", newline="", encoding="utf-8") as csvfile:
+#     writer = csv.writer(csvfile)
+
+#     # Optional header
+#     writer.writerow(["amount"])
+
+#     for item in l:
+#         writer.writerow([item])
+
+sum = 0
+
+for q in query:
+    sum += q.amount
+
+
+print(len(query))
+print(sum)
 
 
 
-db.commit()
+
 
 # # --- Create test account ---
 # test_account = models.Account(

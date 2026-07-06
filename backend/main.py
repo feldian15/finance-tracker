@@ -115,6 +115,8 @@ def get_transactions(
 
     txns = query.all()
 
+    #txns.sort(key=lambda tx: tx.date, reverse=True)
+
     return [
         {
             "id": t.id,
@@ -553,6 +555,7 @@ def sync_transactions(item_id: str, db: Session = Depends(get_db)):
     total_added = 0
     total_duplicates = 0
     total_errors = 0
+    total_pending = 0
     has_more = True
     
     try: 
@@ -563,6 +566,7 @@ def sync_transactions(item_id: str, db: Session = Depends(get_db)):
             total_added += created["created"]
             total_duplicates += created["dups"]
             total_errors += created["errors"]
+            total_pending += created["pending"]
 
             plaid_item.cursor = result["next_cursor"]
             db.commit()
@@ -584,7 +588,8 @@ def sync_transactions(item_id: str, db: Session = Depends(get_db)):
     return {
         "transactions_created": total_added,
         "duplicate_transactions_skipped": total_duplicates,
-        "invalid_transactions": total_errors
+        "invalid_transactions": total_errors,
+        "pending_transactions_skipped": total_pending 
     }
 
 

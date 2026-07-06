@@ -76,7 +76,7 @@ function AccountsSection({
             const result = await syncTransactions(account.plaid_item_id)
             await loadTransactions()
             toast.success(
-                `Added ${result.transactions_created}, duplicates ${result.duplicate_transactions_skipped}, errors ${result.invalid_transactions}`
+                `Added ${result.transactions_created}, duplicates ${result.duplicate_transactions_skipped}, errors ${result.invalid_transactions}, pending ${result.pending_transactions_skipped}`
             )
         } catch (err) {
             if (err.detail?.error_code === "ITEM_LOGIN_REQUIRED") {

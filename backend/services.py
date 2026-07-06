@@ -176,23 +176,30 @@ def sync_transactions(access_token: str, cursor: str = None) -> dict:
 def import_transactions_from_plaid(rows, db):
     created = 0
     error = 0
+    pending = 0
     duplicates = []
 
     rules = db.query(models.CategoryRule).all()
     
     for txn in rows:
         try:
+            print(txn)
+            
             # Get the account id associated with the plaid account id
             account = db.query(models.Account).filter(models.Account.plaid_account_id == txn.account_id).first()
 
             if not account:
                 raise ValueError("Account does not exists")
+            
+            if txn.pending:
+                pending += 1
+                continue
 
             data = {
                 "account_id": account.id,
-                "date": txn.date,
+                "date": txn.authorized_date if txn.authorized_date else txn.date,
                 "description": txn.name,
-                "amount": txn.amount
+                "amount": txn.amount * -1
             }
 
             txn_in = TransactionCreate(**data)
@@ -217,17 +224,23 @@ def import_transactions_from_plaid(rows, db):
             new_txn = models.Transaction(
                 id=str(uuid.uuid4()),
                 account_id=account.id,
-                date=txn.date,
-                amount=txn.amount,
+                date=txn.authorized_date if txn.authorized_date else txn.date,
+                amount=txn.amount * -1,
                 description=txn.name,
                 category_id=category_id,
                 transaction_type=transaction_type,
                 plaid_transaction_id=txn.transaction_id
             )
 
-            is_duplicate = db.query(models.Transaction).filter(models.Transaction.plaid_transaction_id == txn.transaction_id).first()
+            duplicate = db.query(models.Transaction).filter(models.Transaction.plaid_transaction_id == txn.transaction_id).first()
 
-            if is_duplicate:
+            if duplicate:
+                duplicates.append(new_txn)
+                continue
+
+            duplicate = is_duplicate(db, new_txn)
+
+            if duplicate:
                 duplicates.append(new_txn)
                 continue
 
@@ -243,7 +256,8 @@ def import_transactions_from_plaid(rows, db):
         "created": created, 
         "dups": len(duplicates), 
         "errors": error,
-        "dup_list": duplicates
+        "dup_list": duplicates,
+        "pending": pending
     }
 
 
@@ -257,7 +271,10 @@ def import_transactions_from_csv(rows, account_id, rules, db):
     for row in rows:
         try:
             data = normalize_row(row, account_id)
+            print(data)
             txn_in = TransactionCreate(**data)
+
+            print(row)
 
             category_id = apply_category_rules(txn_in, rules)
 
@@ -292,7 +309,8 @@ def import_transactions_from_csv(rows, account_id, rules, db):
             db.add(txn)
             created += 1
 
-        except Exception:
+        except Exception as e:
+            print(e)
             error += 1
             continue
 
@@ -336,6 +354,9 @@ def clean(value):
 
     if value == "":
         return None
+    
+    if "$" in value:
+        value = value.replace("$", "")
 
     return value
 
@@ -352,11 +373,8 @@ def find_column(row, aliases):
 def parse_amount(row):
     amount = find_column(row, COLUMN_MAPPINGS["amount"])
 
-    # Remove $
-    if "$" in amount:
-        amount = amount.replace("$", "")
-
     if amount:
+
         amount = float(clean(amount))
     
         txn_type = find_column(row, COLUMN_MAPPINGS["type"])
@@ -374,6 +392,9 @@ def parse_amount(row):
 
     debit = find_column(row, COLUMN_MAPPINGS["debit"])
     credit = find_column(row, COLUMN_MAPPINGS["credit"])
+
+    print(debit)
+    print(credit)
 
     if debit:
         debit = clean(debit)
@@ -447,7 +468,7 @@ def get_account_balance(db, account_id, as_of=None):
 
     txn_total = sum(t.amount for t in txns)
 
-    return account.opening_balance + txn_total
+    return round(account.opening_balance + txn_total, 2)
 
 # --- Service functions for main.py ---
 def create_transaction(db, txn_data):
@@ -542,22 +563,21 @@ def update_transaction(db, transaction_id, updates):
             models.Category.id == category_id
         ).first()
 
-        # Check if the category is saving/investment:
-        if category:
-            if category.reporting_group in ['savings', 'investments', 'system']:
-                transaction_type = "transfer"
-            elif category.reporting_group == 'income':
-                transaction_type = "income"
-            else:
-                transaction_type = "expense"
-
         if not category:
             raise ValueError("category not found")
+
+        # Check if the category is saving/investment
+        if category:
+            if category.reporting_group in ['savings', 'investments', 'system']:
+                updates["transaction_type"] = "transfer"
+            elif category.reporting_group == 'income':
+                updates["transaction_type"] = "income"
+            else:
+                updates["transaction_type"] = "expense"       
+
     
     for key, value in updates.items():
         setattr(txn, key, value)
-
-    txn.transaction_type = transaction_type
 
     db.commit()
     db.refresh(txn)
@@ -887,8 +907,21 @@ def reapply_category_rules(db):
         )
 
         if category_id:
+            category = db.query(models.Category).filter(
+                models.Category.id == category_id
+            ).first()
+
+            # Check if the category is saving/investment:
+            if category:
+                if category.reporting_group in ['savings', 'investments', 'system']:
+                    transaction_type = "transfer"
+                elif category.reporting_group == 'income':
+                    transaction_type = "income"
+                else:
+                    transaction_type = "expense"
 
             txn.category_id = category_id
+            txn.transaction_type = transaction_type
 
             updated += 1
 
