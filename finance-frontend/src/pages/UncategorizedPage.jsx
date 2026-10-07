@@ -97,8 +97,12 @@ function UncategorizedPage() {
     } 
 
     useEffect(() => {
-        loadTransactions()
-        loadCategories()
+        async function load() {
+            await loadTransactions()
+            await loadCategories()
+        }
+
+        load()
     }, [])
 
     return (

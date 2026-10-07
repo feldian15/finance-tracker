@@ -1,15 +1,10 @@
-import { useMemo } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { useEffect, useState } from "react"
-import { fetchSpendingSummary, fetchDashboardSummary, fetchDashboardDynamicSummary, fetchCategorySpending } from "../api"
+import { fetchDashboardDynamicSummary, fetchCategorySpending } from "../api"
 
 function DashboardPage({ accounts, balances }) {
 
     const navigate = useNavigate()
-
-    const [spending, setSpending] = useState([])
-
-    const [summary, setSummary] = useState(null)
 
     const [dynamic_summary, setDynamicSummary] = useState(null)
 
@@ -30,18 +25,6 @@ function DashboardPage({ accounts, balances }) {
     const [start_date, setStartDate] = useState(firstOfMonth)
 
     const [end_date, setEndDate] = useState(todayString)
-
-    const netWorth = useMemo(() => {
-
-        if (!balances) return 0
-
-        return Object.values(balances)
-            .reduce(
-                (sum, val) => sum + Number(val || 0),
-                0
-            )
-
-    }, [balances])
 
     const getPercent = (total, income, pct) => {
         if (income != 0 || total === 0) {
@@ -97,8 +80,7 @@ function DashboardPage({ accounts, balances }) {
     useEffect(() => {
 
         async function load() {
-            const data = await fetchSpendingSummary()
-            setSpending(data)
+            await loadDynamicSummary()
         }
 
         load()
@@ -106,13 +88,11 @@ function DashboardPage({ accounts, balances }) {
     }, [])
 
     useEffect(() => {
+        async function load() {
+            await loadCategorySpending()
+        }
 
-        loadDynamicSummary()
-
-    }, [])
-
-    useEffect(() => {
-        loadCategorySpending()
+        load()
     }, [])
 
     return (

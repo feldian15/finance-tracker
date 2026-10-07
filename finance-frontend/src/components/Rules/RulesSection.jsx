@@ -1,4 +1,4 @@
-import { createRule, updateRule, deleteRule, reapplyRules } from "../../api"
+import { reapplyRules } from "../../api"
 import { useState } from "react"
 
 function RulesSection({

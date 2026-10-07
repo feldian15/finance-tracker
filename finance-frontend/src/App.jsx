@@ -9,12 +9,10 @@ import { useCallback, useEffect, useState } from "react"
 import { 
     fetchTransactions, 
     fetchCategories, 
-    updateTransaction, 
     fetchAccounts, 
     fetchAccountBalance, 
     createTransaction, 
     createAccount, 
-    updateAccount,
     createCategory,
     updateCategory,
     fetchRules,
@@ -28,11 +26,6 @@ import {
 
 import { Toaster } from "react-hot-toast"
         
-import AccountsSection from "./components/Accounts/AccountsSection"
-import TransactionsSection from "./components/Transactions/TransactionsSection"
-import CategoriesSection from "./components/Categories/CategoriesSection"
-import RulesSection from "./components/Rules/RulesSection"
-import CsvImportSection from "./components/Import/CsvImportSection"
 import UncategorizedPage from "./pages/UncategorizedPage"
 import AccountsPage from "./pages/AccountsPage"
 import TransactionsPage from "./pages/TransactionsPage"
@@ -78,7 +71,8 @@ function App() {
 
     const [newCategory, setNewCategory] = useState({
         name: "",
-        reporting_group: "expense"
+        reporting_group: "expense",
+        target_amount: ""
     })
 
     const [rules, setRules] = useState([])
@@ -97,28 +91,6 @@ function App() {
     const [accountId, setAccountId] = useState("")
     const [descriptionSearch, setDescriptionSearch] = useState("")
     const [appliedTransactionFilters, setAppliedTransactionFilters] = useState(null)
-
-
-    async function handleCategoryChange(
-        transactionId,
-        categoryId
-    ) {
-
-        try {
-
-            await updateTransaction(
-                transactionId,
-                {
-                    category_id: categoryId || null
-                }
-            )
-
-            await loadTransactions()
-
-        } catch (error) {
-            console.error(error)
-        }
-    }
 
     const loadTransactions = useCallback(async (
         filterOverrides = {},
@@ -234,10 +206,14 @@ function App() {
     }
 
     useEffect(() => {
-        clearFilters()
-        loadCategories()
-        loadAccounts(),
-        loadRules()
+        async function loadInitialData() {
+            await clearFilters()
+            await loadCategories()
+            await loadAccounts()
+            await loadRules()
+        }
+
+        loadInitialData()
     }, [])
 
 

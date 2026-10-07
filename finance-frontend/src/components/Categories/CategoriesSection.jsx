@@ -1,5 +1,20 @@
-import { createCategory, updateCategory, deleteCategory } from "../../api"
 import { useState } from "react"
+
+function buildCategoryPayload(category) {
+    const targetAmountValue = category.target_amount
+    const targetAmount = targetAmountValue === ""
+        ? null
+        : Number(targetAmountValue)
+
+    if (targetAmount !== null && targetAmount < 0) {
+        throw new Error("Target amount cannot be negative")
+    }
+
+    return {
+        ...category,
+        target_amount: targetAmount
+    }
+}
 
 function CategoriesSection({
     categories,
@@ -18,11 +33,16 @@ function CategoriesSection({
     const [editingCategoryId, setEditingCategoryId] = useState(null)
     const [categoryEditForm, setCategoryEditForm] = useState({
         name: "",
-        reporting_group: "expense"
+        reporting_group: "expense",
+        target_amount: ""
     })
+    const [categoryError, setCategoryError] = useState("")
 
     return <div>
         <h2>Categories</h2>
+        {categoryError && (
+            <p role="alert">{categoryError}</p>
+        )}
 
             <input
                 placeholder="Category Name"
@@ -50,16 +70,40 @@ function CategoriesSection({
                 <option value="savings">Savings</option>
             </select>
 
+            <input
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="Target Amount"
+                value={newCategory.target_amount}
+                onChange={(e) =>
+                    setNewCategory({
+                        ...newCategory,
+                        target_amount: e.target.value
+                    })
+                }
+            />
+
             <button
                 onClick={async () => {
 
-                    await createCategory(newCategory)
+                    try {
+                        setCategoryError("")
+
+                        await createCategory(
+                            buildCategoryPayload(newCategory)
+                        )
+                    } catch (error) {
+                        setCategoryError(error.message)
+                        return
+                    }
 
                     await loadCategories()
 
                     setNewCategory({
                         name: "",
-                        reporting_group: "expense"
+                        reporting_group: "expense",
+                        target_amount: ""
                     })
                 }}
             >
@@ -72,6 +116,7 @@ function CategoriesSection({
                     <tr>
                         <th>Name</th>
                         <th>Reporting Group</th>
+                        <th>Target Amount</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
@@ -131,6 +176,28 @@ function CategoriesSection({
                             }
 
                             </td>
+                            <td>
+
+                            {
+                                editingCategoryId === cat.id
+                                ? (
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        value={categoryEditForm.target_amount}
+                                        onChange={(e) =>
+                                            setCategoryEditForm({
+                                                ...categoryEditForm,
+                                                target_amount: e.target.value
+                                            })
+                                        }
+                                    />
+                                )
+                                : cat.target_amount ?? ""
+                            }
+
+                            </td>
 
                             <td>
 
@@ -141,10 +208,21 @@ function CategoriesSection({
                                             <button
                                                 onClick={async () => {
 
-                                                    await updateCategory(
-                                                        cat.id,
-                                                        categoryEditForm
-                                                    )
+                                                    try {
+                                                        setCategoryError("")
+
+                                                        await updateCategory(
+                                                            cat.id,
+                                                            buildCategoryPayload(
+                                                                categoryEditForm
+                                                            )
+                                                        )
+                                                    } catch (error) {
+                                                        setCategoryError(
+                                                            error.message
+                                                        )
+                                                        return
+                                                    }
 
                                                     setEditingCategoryId(
                                                         null
@@ -177,7 +255,11 @@ function CategoriesSection({
 
                                                 setCategoryEditForm({
                                                     name: cat.name,
-                                                    reporting_group: cat.reporting_group
+                                                    reporting_group: cat.reporting_group,
+                                                    target_amount: (
+                                                        cat.target_amount ??
+                                                        ""
+                                                    )
                                                 })
                                             }}
                                         >

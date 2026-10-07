@@ -1,4 +1,4 @@
-import { createAccount, deleteAccount, updateAccount, createLinkToken, exchangePublicToken, fetchAccounts, syncTransactions, createUpdateLinkToken, resetCursor } from "../../api"
+import { updateAccount, createLinkToken, exchangePublicToken, syncTransactions, createUpdateLinkToken, resetCursor } from "../../api"
 import { useState, useEffect, useCallback } from "react"
 import { usePlaidLink } from "react-plaid-link"
 import toast from "react-hot-toast"
@@ -27,7 +27,7 @@ function AccountsSection({
 
     const [linkToken, setLinkToken] = useState(null)
     const [updateLinkToken, setUpdateLinkToken] = useState(null)
-    const [reconnectItemId, setReconnectItemId] = useState(null)
+    const [, setReconnectItemId] = useState(null)
 
     useEffect(() => {
         createLinkToken()
