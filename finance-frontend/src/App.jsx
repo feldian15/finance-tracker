@@ -119,22 +119,49 @@ function App() {
         }
     }
 
-    async function loadTransactions() {
+    async function loadTransactions(filterOverrides = {}) {
 
         try {
+            const resolvedCategoryId = filterOverrides.categoryId ?? categoryId
+
             const data = await fetchTransactions({
+                ...filterOverrides,
                 minAmount,
                 maxAmount,
                 startDate,
                 endDate,
                 transactionType,
-                categoryId,
+                categoryId: resolvedCategoryId,
                 accountId,
                 descriptionSearch
             })
 
             setTransactions(data)
 
+        } catch (error) {
+            console.error(error)
+        }
+    }
+
+    async function clearFilters() {
+        setMinAmount("")
+        setMaxAmount("")
+        setStartDate("")
+        setEndDate("")
+        setTransactionType("")
+        setCategoryId("")
+        setAccountId("")
+        setDescriptionSearch("")
+
+        if (window.location.pathname === "/transactions") {
+            const url = new URL(window.location.href)
+            url.searchParams.delete("categoryId")
+            window.history.replaceState({}, "", url)
+        }
+
+        try {
+            const data = await fetchTransactions()
+            setTransactions(data)
         } catch (error) {
             console.error(error)
         }
@@ -183,7 +210,7 @@ function App() {
     }
 
     useEffect(() => {
-        loadTransactions()
+        clearFilters()
         loadCategories()
         loadAccounts(),
         loadRules()
@@ -316,6 +343,7 @@ function App() {
 
                                 descriptionSearch={descriptionSearch}
                                 setDescriptionSearch={setDescriptionSearch}
+                                clearFilters={clearFilters}
                             />
                         }
                     />

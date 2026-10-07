@@ -1,5 +1,6 @@
 import { deleteTransaction, createTransaction, updateTransaction } from "../../api"
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import { useNavigate } from "react-router-dom"
 
 function TransactionsSection({
     transactions,
@@ -36,8 +37,12 @@ function TransactionsSection({
     setAccountId,
     
     descriptionSearch,
-    setDescriptionSearch
+    setDescriptionSearch,
+
+    clearFilters,
+    showResultsImmediately = false
 }) {
+    const navigate = useNavigate()
     const [editingTxnId, setEditingTxnId] = useState(null)
 
     const [editForm, setEditForm] = useState({
@@ -48,7 +53,31 @@ function TransactionsSection({
         transaction_type: "expense"
     })
 
-    const [hasSearched, setHasSearched] = useState(false)
+    const [hasSearched, setHasSearched] = useState(showResultsImmediately)
+    const [sortBy, setSortBy] = useState("")
+
+    useEffect(() => {
+        setHasSearched(showResultsImmediately)
+    }, [showResultsImmediately])
+
+    const sortedTransactions = [...transactions].sort((a, b) => {
+        switch (sortBy) {
+            case "date_asc":
+                return new Date(a.date) - new Date(b.date)
+            case "date_desc":
+                return new Date(b.date) - new Date(a.date)
+            case "amount_asc":
+                return Number(a.amount) - Number(b.amount)
+            case "amount_desc":
+                return Number(b.amount) - Number(a.amount)
+            case "description_asc":
+                return (a.description || "").localeCompare(b.description || "")
+            case "description_desc":
+                return (b.description || "").localeCompare(a.description || "")
+            default:
+                return 0
+        }
+    })
 
     async function saveEdit(txnId) {
         try {
@@ -199,6 +228,35 @@ function TransactionsSection({
                 Apply Filters
             </button>
 
+            <button
+                onClick={async () => {
+                    await clearFilters()
+                    setHasSearched(false)
+                    setSortBy("")
+                    navigate("/transactions", { replace: true })
+                }}
+                style={{ marginLeft: "8px" }}
+            >
+                Clear Filters
+            </button>
+
+            <div style={{ marginTop: "12px", marginBottom: "12px" }}>
+                <label>
+                    Sort by:
+                    <select
+                        value={sortBy}
+                        onChange={(e) => setSortBy(e.target.value)}
+                    >
+                        <option value="">No sorting</option>
+                        <option value="date_desc">Date (Newest first)</option>
+                        <option value="date_asc">Date (Oldest first)</option>
+                        <option value="amount_desc">Amount (Highest first)</option>
+                        <option value="amount_asc">Amount (Lowest first)</option>
+                        <option value="description_asc">Description (A to Z)</option>
+                        <option value="description_desc">Description (Z to A)</option>
+                    </select>
+                </label>
+            </div>
 
             {hasSearched && (
                 <table>
@@ -214,7 +272,7 @@ function TransactionsSection({
                     </thead>
 
                     <tbody>
-                        {transactions.map((txn) => (
+                        {sortedTransactions.map((txn) => (
 
                             <tr key={txn.id}>
 

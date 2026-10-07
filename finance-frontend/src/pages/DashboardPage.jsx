@@ -1,9 +1,11 @@
 import { useMemo } from "react"
-import { Link } from "react-router-dom"
+import { Link, useNavigate } from "react-router-dom"
 import { useEffect, useState } from "react"
 import { fetchSpendingSummary, fetchDashboardSummary, fetchDashboardDynamicSummary, fetchCategorySpending } from "../api"
 
 function DashboardPage({ accounts, balances }) {
+
+    const navigate = useNavigate()
 
     const [spending, setSpending] = useState([])
 
@@ -47,6 +49,14 @@ function DashboardPage({ accounts, balances }) {
         }
         return null;
     };
+
+    function openCategoryTransactions(categoryId) {
+        if (!categoryId) return
+
+        navigate(`/transactions?categoryId=${encodeURIComponent(categoryId)}`, {
+            state: { fromDashboard: true, categoryId }
+        })
+    }
     
 
     async function loadDynamicSummary() {
@@ -221,7 +231,19 @@ function DashboardPage({ accounts, balances }) {
                             {category_spending.categories
                                 .filter(cat => cat.reporting_group === 'income')
                                 .map(cat => (
-                                    <tr key={cat.category_id}>
+                                    <tr
+                                        key={cat.category_id}
+                                        onClick={() => openCategoryTransactions(cat.category_id)}
+                                        onKeyDown={(event) => {
+                                            if (event.key === "Enter" || event.key === " ") {
+                                                event.preventDefault()
+                                                openCategoryTransactions(cat.category_id)
+                                            }
+                                        }}
+                                        style={{ cursor: "pointer" }}
+                                        tabIndex={0}
+                                        role="link"
+                                    >
                                         <td>
                                             {cat.category_name}
                                         </td>
@@ -256,7 +278,19 @@ function DashboardPage({ accounts, balances }) {
                             {category_spending.categories
                                 .filter(cat => cat.reporting_group === 'expense')
                                 .map(cat => (
-                                    <tr key={cat.category_id}>
+                                    <tr
+                                        key={cat.category_id}
+                                        onClick={() => openCategoryTransactions(cat.category_id)}
+                                        onKeyDown={(event) => {
+                                            if (event.key === "Enter" || event.key === " ") {
+                                                event.preventDefault()
+                                                openCategoryTransactions(cat.category_id)
+                                            }
+                                        }}
+                                        style={{ cursor: "pointer" }}
+                                        tabIndex={0}
+                                        role="link"
+                                    >
                                         <td>
                                             {cat.category_name}
                                         </td>
@@ -291,7 +325,19 @@ function DashboardPage({ accounts, balances }) {
                             {category_spending.categories
                                 .filter(cat => ['investments', 'savings'].includes(cat.reporting_group))
                                 .map(cat => (
-                                    <tr key={cat.category_id}>
+                                    <tr
+                                        key={cat.category_id}
+                                        onClick={() => openCategoryTransactions(cat.category_id)}
+                                        onKeyDown={(event) => {
+                                            if (event.key === "Enter" || event.key === " ") {
+                                                event.preventDefault()
+                                                openCategoryTransactions(cat.category_id)
+                                            }
+                                        }}
+                                        style={{ cursor: "pointer" }}
+                                        tabIndex={0}
+                                        role="link"
+                                    >
                                         <td>
                                             {cat.category_name}
                                         </td>
