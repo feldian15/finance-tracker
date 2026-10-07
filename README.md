@@ -1,4 +1,5 @@
 Run backend: 
-```uvicorn main:app --reload  
+```uvicorn main:app --reload``` 
+
 Run Frontend: 
-```npm run dev
+```npm run dev```
