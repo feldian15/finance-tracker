@@ -33,6 +33,42 @@ function DashboardPage({ accounts, balances }) {
         return null;
     };
 
+    const formatMoney = (amount) => {
+        if (amount === null || amount === undefined) {
+            return "N/A"
+        }
+
+        return `$${amount.toFixed(2)}`
+    }
+
+    const formatPercent = (percent) => {
+        if (percent === null || percent === undefined) {
+            return "N/A"
+        }
+
+        return `${percent.toFixed(2)}%`
+    }
+
+    const renderTargetComparisonCells = (category) => (
+        <>
+            <td>
+                {formatMoney(category.target_amount)}
+            </td>
+            <td>
+                {category.target_amount === null || category.target_amount === undefined
+                    ? "N/A"
+                    : formatMoney(category.target_difference)
+                }
+            </td>
+            <td>
+                {category.target_amount
+                    ? formatPercent(category.target_percent_difference)
+                    : "N/A"
+                }
+            </td>
+        </>
+    )
+
     function openCategoryTransactions(categoryId) {
         if (!categoryId) return
 
@@ -192,6 +228,9 @@ function DashboardPage({ accounts, balances }) {
                                 <th>Number of Months</th>
                                 <th>Total</th>
                                 <th>Average</th>
+                                <th>Target Amount</th>
+                                <th>Difference</th>
+                                <th>% Diff</th>
                                 <th>Percentage of Income</th>
                             </tr>
                         </thead>
@@ -203,10 +242,12 @@ function DashboardPage({ accounts, balances }) {
                                 <td>{category_spending.months}</td>
                                 <td>${category_spending.income.toFixed(2)}</td>
                                 <td>${(category_spending.income / category_spending.months).toFixed(2)}</td>
+                                <td></td>
+                                <td></td>
+                                <td></td>
                             </tr>
                             <tr>
-                                <td><hr/></td>
-                                <td><hr/></td>
+                                <td colSpan={9}><hr/></td>
                             </tr>
                             {category_spending.categories
                                 .filter(cat => cat.reporting_group === 'income')
@@ -239,6 +280,7 @@ function DashboardPage({ accounts, balances }) {
                                         <td>
                                             ${cat.avg_total.toFixed(2)}
                                         </td>
+                                        {renderTargetComparisonCells(cat)}
                                         <td>
                                             {getPercent(cat.total, category_spending.income, cat.pct_income) === null
                                                 ? "N/A"
@@ -248,12 +290,7 @@ function DashboardPage({ accounts, balances }) {
                                     </tr>
                             ))}
                             <tr>
-                                <td><hr/></td>
-                                <td><hr/></td>
-                                <td><hr/></td>
-                                <td><hr/></td>
-                                <td><hr/></td>
-                                <td><hr/></td>
+                                <td colSpan={9}><hr/></td>
                             </tr>
                             {category_spending.categories
                                 .filter(cat => cat.reporting_group === 'expense')
@@ -286,6 +323,7 @@ function DashboardPage({ accounts, balances }) {
                                         <td>
                                             ${cat.avg_total.toFixed(2)}
                                         </td>
+                                        {renderTargetComparisonCells(cat)}
                                         <td>
                                             {getPercent(cat.total, category_spending.income, cat.pct_income) === null
                                                 ? "N/A"
@@ -295,12 +333,7 @@ function DashboardPage({ accounts, balances }) {
                                     </tr>
                             ))}
                             <tr>
-                                <td><hr/></td>
-                                <td><hr/></td>
-                                <td><hr/></td>
-                                <td><hr/></td>
-                                <td><hr/></td>
-                                <td><hr/></td>
+                                <td colSpan={9}><hr/></td>
                             </tr>
                             {category_spending.categories
                                 .filter(cat => ['investments', 'savings'].includes(cat.reporting_group))
@@ -333,6 +366,7 @@ function DashboardPage({ accounts, balances }) {
                                         <td>
                                             ${cat.avg_total.toFixed(2)}
                                         </td>
+                                        {renderTargetComparisonCells(cat)}
                                         <td>
                                             {getPercent(cat.total, category_spending.income, cat.pct_income) === null
                                                 ? "N/A"
@@ -342,12 +376,7 @@ function DashboardPage({ accounts, balances }) {
                                     </tr>
                             ))}
                             <tr>
-                                <td><hr/></td>
-                                <td><hr/></td>
-                                <td><hr/></td>
-                                <td><hr/></td>
-                                <td><hr/></td>
-                                <td><hr/></td>
+                                <td colSpan={9}><hr/></td>
                             </tr>
                             <tr>
                                 <td>Leftover</td>
@@ -355,6 +384,9 @@ function DashboardPage({ accounts, balances }) {
                                 <td>{category_spending.months}</td>
                                 <td>${category_spending.leftover.toFixed(2)}</td>
                                 <td>${(category_spending.leftover / category_spending.months).toFixed(2)}</td>
+                                <td></td>
+                                <td></td>
+                                <td></td>
                                 <td>{category_spending.income === 0 ? "N/A" : `${((category_spending.leftover / category_spending.income) * 100).toFixed(2)}%`}</td>
                             </tr>
                         </tbody>
