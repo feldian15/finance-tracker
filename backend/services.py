@@ -1070,6 +1070,7 @@ def get_category_spending(db, start_date, end_date):
             models.Category.id,
             models.Category.name,
             models.Category.reporting_group,
+            models.Category.target_amount,
             func.coalesce(func.abs(func.sum(models.Transaction.amount)), 0).label("total")
         )
         .outerjoin(
@@ -1084,7 +1085,8 @@ def get_category_spending(db, start_date, end_date):
         .group_by(
             models.Category.id,
             models.Category.name,
-            models.Category.reporting_group
+            models.Category.reporting_group,
+            models.Category.target_amount
         )
         .all()
     )
@@ -1098,6 +1100,16 @@ def get_category_spending(db, start_date, end_date):
 
     for r in rows:
         avg_total = r.total / months
+        target_difference = (
+            avg_total - r.target_amount
+            if r.target_amount is not None
+            else None
+        )
+        target_percent_difference = (
+            target_difference / r.target_amount * 100
+            if r.target_amount
+            else None
+        )
         
         #if income != 0:
         pct_income = r.total / income * 100 if income else 0
@@ -1109,6 +1121,9 @@ def get_category_spending(db, start_date, end_date):
             "reporting_group": r.reporting_group,
             "total": r.total,
             "avg_total": avg_total,
+            "target_amount": r.target_amount,
+            "target_difference": target_difference,
+            "target_percent_difference": target_percent_difference,
             "pct_income": pct_income
         })
 
