@@ -1,5 +1,10 @@
 # Repository Guidelines
 
+## Output Guidelines
+- Respond concisely. Skip pleasantries, preambles, and unnecessary explanations.
+Provide only the code or direct answer requested.
+- When grilling, ask one question at a time and wait for a response before proceeding.
+
 ## Project Structure & Module Organization
 
 This repository contains a FastAPI backend in `backend/` and a Vite React frontend in `finance-frontend/`. Backend entrypoints and helpers live in flat Python modules such as `main.py`, `services.py`, `models.py`, `schemas.py`, and `db.py`. Frontend source lives under `finance-frontend/src/`, with page components in `src/pages/`, reusable UI sections in `src/components/`, API helpers in `src/api.js`, and static assets in `src/assets/` or `public/`.
