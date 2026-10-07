@@ -79,6 +79,7 @@ class Category(Base):
     id = Column(String, primary_key=True)
     name = Column(String, unique=True, nullable=False)
     reporting_group = Column(Enum(ReportingGroup), nullable=False)
+    target_amount = Column(Float, nullable=True)
 
 
 class CategoryRule(Base):
@@ -109,5 +110,4 @@ class PlaidItem(Base):
     access_token = Column(String, nullable=False)
     institution_name = Column(String, nullable=True)
     cursor = Column(String, nullable=True)
-
 

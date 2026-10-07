@@ -1,7 +1,7 @@
 from unicodedata import category
 
 from django import db
-from sqlalchemy import func
+from sqlalchemy import func, inspect, text
 from sqlalchemy.exc import IntegrityError
 
 import models
@@ -65,6 +65,18 @@ configuration = plaid.Configuration(
 
 api_client = plaid.ApiClient(configuration)
 client = plaid_api.PlaidApi(api_client)
+
+
+def ensure_category_target_amount_column(engine):
+    columns = inspect(engine).get_columns("categories")
+
+    if any(column["name"] == "target_amount" for column in columns):
+        return
+
+    with engine.begin() as conn:
+        conn.execute(
+            text("ALTER TABLE categories ADD COLUMN target_amount FLOAT")
+        )
 
 def encrypt_token(token: str) -> str:
     return fernet.encrypt(token.encode()).decode()
@@ -667,15 +679,18 @@ def update_account(db, account_id, updates):
 
 
 def update_category(db, category_id, updates):
-    if category.category_id == "INTERNAL_TRANSFER":
-        raise ValueError("system categories cannot be updated")
-
     cat = db.query(models.Category).filter(
         models.Category.id == category_id
     ).first()
 
     if not cat:
         raise ValueError("category not found")
+
+    if cat.reporting_group == models.ReportingGroup.SYSTEM:
+        raise ValueError("system categories cannot be updated")
+
+    if updates.get("reporting_group") == models.ReportingGroup.SYSTEM:
+        raise ValueError("categories cannot be changed to the system reporting group")
 
     # Prevent duplicate category names
     if "name" in updates:

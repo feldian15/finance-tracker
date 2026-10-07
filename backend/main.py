@@ -18,6 +18,7 @@ from plaid.exceptions import ApiException
 
 
 models.Base.metadata.create_all(bind=engine)
+services.ensure_category_target_amount_column(engine)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -205,6 +206,9 @@ def get_categories(db: Session = Depends(get_db)):
 
 @app.post("/categories", response_model=CategoryOut)
 def create_category(category: CategoryCreate, db: Session = Depends(get_db)):
+    if category.reporting_group == models.ReportingGroup.SYSTEM:
+        raise HTTPException(status_code=400, detail="system categories cannot be created")
+
     query = db.query(models.Category).filter(models.Category.name == category.name).first()
     if query:
         raise HTTPException(status_code=409, detail="category with this name already exists")
@@ -212,7 +216,8 @@ def create_category(category: CategoryCreate, db: Session = Depends(get_db)):
     new_cat = models.Category(
         id=str(uuid.uuid4()),
         name=category.name,
-        reporting_group=category.reporting_group
+        reporting_group=category.reporting_group,
+        target_amount=category.target_amount
     )
 
     db.add(new_cat)

@@ -17,3 +17,8 @@ An action that removes draft filters from the transactions page controls without
 ## Dashboard Category Drilldown
 
 Navigation from a spending category on the dashboard to the transactions page with that category already applied as a filter.
+
+## Target Amount
+
+The estimated monthly amount for a category.
+_Avoid_: Budget, period target

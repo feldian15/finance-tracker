@@ -68,11 +68,13 @@ class AccountUpdate(BaseModel):
 class CategoryCreate(BaseModel):
     name: str
     reporting_group: ReportingGroup = ReportingGroup.EXPENSE
+    target_amount: float | None = Field(default=None, ge=0)
 
 class CategoryOut(BaseModel):
     id: str
     name: str
     reporting_group: ReportingGroup
+    target_amount: float | None = None
 
     class Config:
         from_attributes = True  
@@ -81,6 +83,7 @@ class CategoryOut(BaseModel):
 class CategoryUpdate(BaseModel):
     name: str | None = None
     reporting_group: ReportingGroup | None = None
+    target_amount: float | None = Field(default=None, ge=0)
 
 
 class CategoryRuleCreate(BaseModel):
