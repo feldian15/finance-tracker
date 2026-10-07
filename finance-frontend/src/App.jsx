@@ -5,7 +5,7 @@ import {
     Link
 } from "react-router-dom"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { 
     fetchTransactions, 
     fetchCategories, 
@@ -96,6 +96,7 @@ function App() {
     const [categoryId, setCategoryId] = useState("")
     const [accountId, setAccountId] = useState("")
     const [descriptionSearch, setDescriptionSearch] = useState("")
+    const [appliedTransactionFilters, setAppliedTransactionFilters] = useState(null)
 
 
     async function handleCategoryChange(
@@ -119,25 +120,55 @@ function App() {
         }
     }
 
-    async function loadTransactions(filterOverrides = {}) {
+    const loadTransactions = useCallback(async (
+        filterOverrides = {},
+        options = {}
+    ) => {
 
         try {
-            const resolvedCategoryId = filterOverrides.categoryId ?? categoryId
-
-            const data = await fetchTransactions({
-                ...filterOverrides,
+            const baseFilters = options.ignoreDraftFilters ? {} : {
                 minAmount,
                 maxAmount,
                 startDate,
                 endDate,
                 transactionType,
-                categoryId: resolvedCategoryId,
+                categoryId,
                 accountId,
                 descriptionSearch
-            })
+            }
 
+            const filters = {
+                ...baseFilters,
+                ...filterOverrides
+            }
+
+            const data = await fetchTransactions(filters)
+
+            setAppliedTransactionFilters(filters)
             setTransactions(data)
 
+        } catch (error) {
+            console.error(error)
+        }
+    }, [
+        minAmount,
+        maxAmount,
+        startDate,
+        endDate,
+        transactionType,
+        categoryId,
+        accountId,
+        descriptionSearch
+    ])
+
+    async function refreshTransactions() {
+        if (!appliedTransactionFilters) {
+            return
+        }
+
+        try {
+            const data = await fetchTransactions(appliedTransactionFilters)
+            setTransactions(data)
         } catch (error) {
             console.error(error)
         }
@@ -157,13 +188,6 @@ function App() {
             const url = new URL(window.location.href)
             url.searchParams.delete("categoryId")
             window.history.replaceState({}, "", url)
-        }
-
-        try {
-            const data = await fetchTransactions()
-            setTransactions(data)
-        } catch (error) {
-            console.error(error)
         }
     }
 
@@ -321,6 +345,7 @@ function App() {
                                 setEndDate={setEndDate}
 
                                 loadTransactions={loadTransactions}
+                                refreshTransactions={refreshTransactions}
 
                                 newTxn={newTxn}
                                 setNewTxn={setNewTxn}
@@ -329,8 +354,6 @@ function App() {
                                 createTransaction={createTransaction}
 
                                 deleteTransaction={deleteTransaction}
-
-                                transactionType={transactionType}
 
                                 transactionType={transactionType}
                                 setTransactionType={setTransactionType}

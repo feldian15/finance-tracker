@@ -1,5 +1,5 @@
-import { deleteTransaction, createTransaction, updateTransaction } from "../../api"
-import { useEffect, useState } from "react"
+import { updateTransaction } from "../../api"
+import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 
 function TransactionsSection({
@@ -18,6 +18,7 @@ function TransactionsSection({
     setEndDate,
 
     loadTransactions,
+    refreshTransactions,
 
     newTxn,
     setNewTxn,
@@ -40,7 +41,7 @@ function TransactionsSection({
     setDescriptionSearch,
 
     clearFilters,
-    showResultsImmediately = false
+    drilldownCategoryId = ""
 }) {
     const navigate = useNavigate()
     const [editingTxnId, setEditingTxnId] = useState(null)
@@ -53,15 +54,15 @@ function TransactionsSection({
         transaction_type: "expense"
     })
 
-    const [hasSearched, setHasSearched] = useState(showResultsImmediately)
-    const [sortBy, setSortBy] = useState("")
-
-    useEffect(() => {
-        setHasSearched(showResultsImmediately)
-    }, [showResultsImmediately])
+    const [hasSearched, setHasSearched] = useState(false)
+    const [sortBy, setSortBy] = useState(null)
+    const visibleResults = hasSearched || Boolean(drilldownCategoryId)
+    const selectedSortBy = sortBy ?? (
+        drilldownCategoryId ? "date_desc" : ""
+    )
 
     const sortedTransactions = [...transactions].sort((a, b) => {
-        switch (sortBy) {
+        switch (selectedSortBy) {
             case "date_asc":
                 return new Date(a.date) - new Date(b.date)
             case "date_desc":
@@ -89,7 +90,7 @@ function TransactionsSection({
 
             setEditingTxnId(null)
 
-            await loadTransactions()
+            await refreshTransactions()
 
         } catch (error) {
             console.error(error)
@@ -230,9 +231,15 @@ function TransactionsSection({
 
             <button
                 onClick={async () => {
+                    const shouldKeepResultsVisible = visibleResults
+
                     await clearFilters()
-                    setHasSearched(false)
-                    setSortBy("")
+
+                    if (sortBy === null && drilldownCategoryId) {
+                        setSortBy("date_desc")
+                    }
+
+                    setHasSearched(shouldKeepResultsVisible)
                     navigate("/transactions", { replace: true })
                 }}
                 style={{ marginLeft: "8px" }}
@@ -244,7 +251,7 @@ function TransactionsSection({
                 <label>
                     Sort by:
                     <select
-                        value={sortBy}
+                        value={selectedSortBy}
                         onChange={(e) => setSortBy(e.target.value)}
                     >
                         <option value="">No sorting</option>
@@ -258,7 +265,7 @@ function TransactionsSection({
                 </label>
             </div>
 
-            {hasSearched && (
+            {visibleResults && (
                 <table>
                     <thead>
                         <tr>
@@ -400,7 +407,7 @@ function TransactionsSection({
                                     <button
                                         onClick={async () => {
                                             await deleteTransaction(txn.id)
-                                            await loadTransactions()
+                                            await refreshTransactions()
                                         }}
                                     >
                                         Delete
@@ -500,7 +507,7 @@ function TransactionsSection({
                 disabled={!newTxn.account_id}
                 onClick={async () => {
                     await createTransaction(newTxn)
-                    await loadTransactions()
+                    await refreshTransactions()
 
                     setNewTxn(initialTxnState)
                 }}

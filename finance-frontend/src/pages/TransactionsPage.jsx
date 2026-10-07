@@ -1,22 +1,59 @@
-import { useEffect } from "react"
-import { useLocation, useSearchParams } from "react-router-dom"
+import { useEffect, useRef } from "react"
+import { useSearchParams } from "react-router-dom"
 import TransactionsSection from "../components/Transactions/TransactionsSection"
 
-function TransactionsPage(props) {
-    const location = useLocation()
+function TransactionsPage({
+    categoryId,
+    setCategoryId,
+    setMinAmount,
+    setMaxAmount,
+    setStartDate,
+    setEndDate,
+    setTransactionType,
+    setAccountId,
+    setDescriptionSearch,
+    loadTransactions,
+    ...props
+}) {
     const [searchParams] = useSearchParams()
+    const loadedCategoryRef = useRef("")
+    const categoryFromQuery = searchParams.get("categoryId") || ""
 
     useEffect(() => {
-        const categoryFromQuery = searchParams.get("categoryId") || ""
-
         if (!categoryFromQuery) {
             return
         }
 
-        if (props.categoryId !== categoryFromQuery) {
-            props.setCategoryId(categoryFromQuery)
+        if (loadedCategoryRef.current === categoryFromQuery) {
+            return
         }
-    }, [searchParams, props.categoryId, props.setCategoryId])
+
+        loadedCategoryRef.current = categoryFromQuery
+        setMinAmount("")
+        setMaxAmount("")
+        setStartDate("")
+        setEndDate("")
+        setTransactionType("")
+        setCategoryId(categoryFromQuery)
+        setAccountId("")
+        setDescriptionSearch("")
+
+        loadTransactions(
+            { categoryId: categoryFromQuery },
+            { ignoreDraftFilters: true }
+        )
+    }, [
+        categoryFromQuery,
+        setCategoryId,
+        setMinAmount,
+        setMaxAmount,
+        setStartDate,
+        setEndDate,
+        setTransactionType,
+        setAccountId,
+        setDescriptionSearch,
+        loadTransactions
+    ])
 
     return (
         <div>
@@ -24,6 +61,17 @@ function TransactionsPage(props) {
 
             <TransactionsSection
                 {...props}
+                categoryId={categoryId}
+                setCategoryId={setCategoryId}
+                setMinAmount={setMinAmount}
+                setMaxAmount={setMaxAmount}
+                setStartDate={setStartDate}
+                setEndDate={setEndDate}
+                setTransactionType={setTransactionType}
+                setAccountId={setAccountId}
+                setDescriptionSearch={setDescriptionSearch}
+                loadTransactions={loadTransactions}
+                drilldownCategoryId={categoryFromQuery}
             />
         </div>
     )
