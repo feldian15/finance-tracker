@@ -475,6 +475,11 @@ def category_spending(start_date: date, end_date: date, db: Session = Depends(ge
     return services.get_category_spending(db, start_date, end_date)
 
 
+@app.get("/dashboard/chart_data")
+def dashboard_chart_data(start_date: date, end_date: date, db: Session = Depends(get_db)):
+    return services.get_dashboard_chart_data(db, start_date, end_date)
+
+
 class PublicTokenRequest(BaseModel):
     public_token: str
 

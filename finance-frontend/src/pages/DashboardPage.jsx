@@ -1,73 +1,222 @@
 import { Link, useNavigate } from "react-router-dom"
-import { useEffect, useState } from "react"
-import { fetchDashboardDynamicSummary, fetchCategorySpending } from "../api"
+import { Fragment, useEffect, useMemo, useState } from "react"
+import {
+    fetchDashboardChartData,
+    fetchDashboardDynamicSummary,
+    fetchCategorySpending
+} from "../api"
+import toast from "react-hot-toast"
 
-function DashboardPage({ accounts, balances }) {
+const today = new Date()
+
+function toDateInputValue(date) {
+    return date.toISOString().split("T")[0]
+}
+
+function firstDayOfMonth(date) {
+    return new Date(date.getFullYear(), date.getMonth(), 1)
+}
+
+function lastDayOfMonth(date) {
+    return new Date(date.getFullYear(), date.getMonth() + 1, 0)
+}
+
+function addMonths(date, months) {
+    return new Date(date.getFullYear(), date.getMonth() + months, 1)
+}
+
+function getPresetRange(preset) {
+    const currentMonth = firstDayOfMonth(today)
+
+    if (preset === "previous_month") {
+        const start = addMonths(currentMonth, -1)
+        return {
+            startDate: toDateInputValue(start),
+            endDate: toDateInputValue(lastDayOfMonth(start))
+        }
+    }
+
+    if (preset === "last_3_months") {
+        const start = addMonths(currentMonth, -2)
+        return {
+            startDate: toDateInputValue(start),
+            endDate: toDateInputValue(lastDayOfMonth(currentMonth))
+        }
+    }
+
+    if (preset === "last_6_months") {
+        const start = addMonths(currentMonth, -5)
+        return {
+            startDate: toDateInputValue(start),
+            endDate: toDateInputValue(lastDayOfMonth(currentMonth))
+        }
+    }
+
+    if (preset === "year_to_date") {
+        const start = new Date(today.getFullYear(), 0, 1)
+        return {
+            startDate: toDateInputValue(start),
+            endDate: toDateInputValue(lastDayOfMonth(currentMonth))
+        }
+    }
+
+    return {
+        startDate: toDateInputValue(currentMonth),
+        endDate: toDateInputValue(lastDayOfMonth(currentMonth))
+    }
+}
+
+function formatMoney(amount, options = {}) {
+    if (amount === null || amount === undefined) {
+        return ""
+    }
+
+    const absAmount = Math.abs(Number(amount))
+    const formatted = absAmount.toLocaleString("en-US", {
+        style: "currency",
+        currency: "USD",
+        minimumFractionDigits: 2
+    })
+
+    if (!options.signed) {
+        return formatted
+    }
+
+    if (Number(amount) > 0) {
+        return `+${formatted}`
+    }
+
+    if (Number(amount) < 0) {
+        return `-${formatted}`
+    }
+
+    return formatted
+}
+
+function formatPercent(percent, options = {}) {
+    if (percent === null || percent === undefined) {
+        return ""
+    }
+
+    const absPercent = Math.abs(Number(percent))
+    const formatted = `${absPercent.toFixed(0)}%`
+
+    if (!options.signed) {
+        return formatted
+    }
+
+    if (Number(percent) > 0) {
+        return `+${formatted}`
+    }
+
+    if (Number(percent) < 0) {
+        return `-${formatted}`
+    }
+
+    return formatted
+}
+
+function getFavorability(category, diffPercent) {
+    if (!diffPercent) {
+        return "neutral"
+    }
+
+    if (["savings", "investments", "income"].includes(category.reporting_group)) {
+        return diffPercent > 0 ? "good" : "bad"
+    }
+
+    return diffPercent < 0 ? "good" : "bad"
+}
+
+function getDiffStyle(category, diffPercent) {
+    if (diffPercent === null || diffPercent === undefined) {
+        return {}
+    }
+
+    const favorability = getFavorability(category, diffPercent)
+
+    if (favorability === "neutral") {
+        return {}
+    }
+
+    const intensity = Math.min(Math.abs(diffPercent) / 35, 1)
+    const alpha = 0.08 + (intensity * 0.22)
+    const color = favorability === "good"
+        ? `rgba(28, 121, 76, ${alpha})`
+        : `rgba(188, 71, 73, ${alpha})`
+
+    return {
+        backgroundColor: color
+    }
+}
+
+function getGroupLabel(group) {
+    const labels = {
+        income: "Income",
+        expense: "Expenses",
+        savings: "Savings",
+        investments: "Investments"
+    }
+
+    return labels[group] || group
+}
+
+function shouldShowCategory(category) {
+    const hasExpected = category.target_amount !== null
+        && category.target_amount !== undefined
+        && Math.abs(Number(category.target_amount)) > 0
+    const hasActual = Math.abs(Number(category.total)) > 0
+
+    return hasExpected || hasActual
+}
+
+function DashboardPage({
+    accounts,
+    balances,
+    loadAccounts,
+    loadTransactions,
+    syncTransactions,
+    uncategorizedCount,
+    refreshUncategorizedCount
+}) {
 
     const navigate = useNavigate()
 
-    const [dynamic_summary, setDynamicSummary] = useState(null)
+    const [dynamicSummary, setDynamicSummary] = useState(null)
+    const [categorySpending, setCategorySpending] = useState(null)
+    const [periodPreset, setPeriodPreset] = useState("current_month")
+    const initialRange = getPresetRange("current_month")
+    const [startDate, setStartDate] = useState(initialRange.startDate)
+    const [endDate, setEndDate] = useState(initialRange.endDate)
+    const [syncStatus, setSyncStatus] = useState("")
+    const [isSyncing, setIsSyncing] = useState(false)
+    const [isChartOpen, setIsChartOpen] = useState(false)
+    const [chartMode, setChartMode] = useState("categories")
+    const [selectedCategoryIds, setSelectedCategoryIds] = useState([])
+    const [selectedGroups, setSelectedGroups] = useState([])
+    const [chartData, setChartData] = useState(null)
 
-    const [category_spending, setCategorySpending] = useState(null)
+    const totalBalance = accounts.reduce((sum, account) => {
+        return sum + Number(balances?.[account.id] ?? 0)
+    }, 0)
 
-    const today = new Date()
-
-    const firstOfMonth = 
-        new Date(
-            today.getFullYear(),
-            today.getMonth(),
-            1
-        ).toISOString().split("T")[0]
-
-    const todayString = 
-        today.toISOString().split("T")[0]
-
-    const [start_date, setStartDate] = useState(firstOfMonth)
-
-    const [end_date, setEndDate] = useState(todayString)
-
-    const getPercent = (total, income, pct) => {
-        if (income != 0 || total === 0) {
-            return pct;
-        }
-        return null;
-    };
-
-    const formatMoney = (amount) => {
-        if (amount === null || amount === undefined) {
-            return "N/A"
+    const categoryGroups = useMemo(() => {
+        if (!categorySpending?.categories) {
+            return []
         }
 
-        return `$${amount.toFixed(2)}`
-    }
+        const groupOrder = ["income", "expense", "savings", "investments"]
 
-    const formatPercent = (percent) => {
-        if (percent === null || percent === undefined) {
-            return "N/A"
-        }
-
-        return `${percent.toFixed(2)}%`
-    }
-
-    const renderTargetComparisonCells = (category) => (
-        <>
-            <td>
-                {formatMoney(category.target_amount)}
-            </td>
-            <td>
-                {category.target_amount === null || category.target_amount === undefined
-                    ? "N/A"
-                    : formatMoney(category.target_difference)
-                }
-            </td>
-            <td>
-                {category.target_amount
-                    ? formatPercent(category.target_percent_difference)
-                    : "N/A"
-                }
-            </td>
-        </>
-    )
+        return groupOrder
+            .map((group) => ({
+                group,
+                categories: categorySpending.categories
+                    .filter((category) => category.reporting_group === group)
+                    .filter(shouldShowCategory)
+                    .sort((a, b) => Math.abs(b.total) - Math.abs(a.total))
+            }))
+            .filter((section) => section.categories.length > 0)
+    }, [categorySpending])
 
     function openCategoryTransactions(categoryId) {
         if (!categoryId) return
@@ -76,399 +225,483 @@ function DashboardPage({ accounts, balances }) {
             state: { fromDashboard: true, categoryId }
         })
     }
-    
 
-    async function loadDynamicSummary() {
+    function updatePreset(preset) {
+        setPeriodPreset(preset)
 
+        if (preset === "manual") {
+            return
+        }
+
+        const range = getPresetRange(preset)
+        setStartDate(range.startDate)
+        setEndDate(range.endDate)
+        loadDashboardData(range.startDate, range.endDate)
+    }
+
+    async function loadDashboardData(
+        selectedStartDate = startDate,
+        selectedEndDate = endDate,
+        shouldLoadChart = isChartOpen
+    ) {
         try {
+            const requests = [
+                fetchDashboardDynamicSummary(selectedStartDate, selectedEndDate),
+                fetchCategorySpending(selectedStartDate, selectedEndDate)
+            ]
 
-            const data = 
-                await fetchDashboardDynamicSummary(
-                    start_date,
-                    end_date
-                )
+            if (shouldLoadChart) {
+                requests.push(fetchDashboardChartData(selectedStartDate, selectedEndDate))
+            }
 
-            setDynamicSummary(data)
+            const [summaryData, categoryData, nextChartData] = await Promise.all(requests)
 
+            setDynamicSummary(summaryData)
+            setCategorySpending(categoryData)
+
+            if (shouldLoadChart) {
+                setChartData(nextChartData)
+            }
         } catch (error) {
-
             console.error(error)
         }
     }
 
-    async function loadCategorySpending() {
+    async function toggleChartSection() {
+        const nextIsOpen = !isChartOpen
+        setIsChartOpen(nextIsOpen)
+
+        if (!nextIsOpen) {
+            return
+        }
+
+        setChartMode("categories")
+        setSelectedCategoryIds([])
+        setSelectedGroups([])
 
         try {
-            const data = await fetchCategorySpending(
-                start_date,
-                end_date
+            const data = await fetchDashboardChartData(startDate, endDate)
+            setChartData(data)
+        } catch (error) {
+            console.error(error)
+        }
+    }
+
+    function toggleChartSelection(value) {
+        if (chartMode === "categories") {
+            setSelectedCategoryIds((current) => (
+                current.includes(value)
+                    ? current.filter((id) => id !== value)
+                    : [...current, value]
+            ))
+            return
+        }
+
+        setSelectedGroups((current) => (
+            current.includes(value)
+                ? current.filter((group) => group !== value)
+                : [...current, value]
+        ))
+    }
+
+    async function syncAllAccounts() {
+        const itemIds = [
+            ...new Set(
+                accounts
+                    .map((account) => account.plaid_item_id)
+                    .filter(Boolean)
+            )
+        ]
+
+        if (itemIds.length === 0) {
+            const message = "No connected accounts to sync"
+            setSyncStatus(message)
+            toast(message)
+            return
+        }
+
+        setIsSyncing(true)
+        setSyncStatus("Syncing connected accounts...")
+
+        try {
+            const results = await Promise.all(
+                itemIds.map((itemId) => syncTransactions(itemId))
             )
 
-            setCategorySpending(data)
+            const created = results.reduce((sum, result) => (
+                sum + Number(result.transactions_created || 0)
+            ), 0)
+            const duplicates = results.reduce((sum, result) => (
+                sum + Number(result.duplicate_transactions_skipped || 0)
+            ), 0)
 
+            await Promise.all([
+                loadAccounts(),
+                loadTransactions(),
+                loadDashboardData(),
+                refreshUncategorizedCount()
+            ])
+
+            const message = `Sync complete: ${created} added, ${duplicates} duplicates`
+            setSyncStatus(message)
+            toast.success(message)
         } catch (error) {
-
             console.error(error)
+            setSyncStatus("Sync failed. Check Accounts if reconnect is needed.")
+            toast.error("Sync failed")
+        } finally {
+            setIsSyncing(false)
         }
     }
 
-
     useEffect(() => {
+        let isCurrent = true
 
-        async function load() {
-            await loadDynamicSummary()
+        async function loadInitialDashboardData() {
+            try {
+                const range = getPresetRange("current_month")
+                const [summaryData, categoryData] = await Promise.all([
+                    fetchDashboardDynamicSummary(range.startDate, range.endDate),
+                    fetchCategorySpending(range.startDate, range.endDate)
+                ])
+
+                if (!isCurrent) {
+                    return
+                }
+
+                setDynamicSummary(summaryData)
+                setCategorySpending(categoryData)
+            } catch (error) {
+                console.error(error)
+            }
         }
 
-        load()
+        loadInitialDashboardData()
 
-    }, [])
-
-    useEffect(() => {
-        async function load() {
-            await loadCategorySpending()
+        return () => {
+            isCurrent = false
         }
-
-        load()
     }, [])
+
+    const summaryItems = dynamicSummary ? [
+        ["Income", dynamicSummary.income, false],
+        ["Expenses", dynamicSummary.expenses, false],
+        ["Savings", dynamicSummary.savings, false],
+        ["Investments", dynamicSummary.investments, false],
+        ["Surplus/Deficit", dynamicSummary.surplus_deficit, true]
+    ] : []
 
     return (
-        <div>
-
-            <h1>Dashboard</h1>
-
-            {/* NET WORTH
-            <div style={{ marginBottom: "20px" }}>
-                <h2>Cash Amount</h2>
-                <h1>
-                    ${netWorth.toFixed(2)}
-                </h1>
-            </div>
-
-            <hr /> */}
-
-            {/* DYNAMIC SPENDING SUMMARY */}
-            <h2>Set Date Range</h2>
-            <input
-                type="date"
-                value={start_date}
-                onChange={(e) =>
-                    setStartDate(e.target.value)
-                }
-            />
-
-            <input
-                type="date"
-                value={end_date}
-                onChange={(e) =>
-                    setEndDate(e.target.value)
-                }
-            />
-
-            <button 
-                onClick={() => {
-                    loadDynamicSummary()
-                    loadCategorySpending()
-                }}
-            >
-                Apply Date Range
-            </button>
-
-            <hr/>
-
-            {dynamic_summary && (
-
+        <main className="dashboard-page">
+            <header className="dashboard-header">
                 <div>
-
-                    <h2>
-                        Spending Summary
-                    </h2>
-
-                    
-
-                    <p>
-                        Income:
-                        ${Math.abs(dynamic_summary.income).toFixed(2)}
+                    <h1>Dashboard</h1>
+                    <p className="dashboard-subtitle">
+                        Monthly category spending and account status
                     </p>
-
-                    <p>
-                        Expenses:
-                        ${Math.abs(dynamic_summary.expenses).toFixed(2)}
-                    </p>
-
-                    <p>
-                        Savings:
-                        ${Math.abs(dynamic_summary.savings).toFixed(2)}
-                    </p>
-
-                    <p>
-                        Investments:
-                        ${Math.abs(dynamic_summary.investments).toFixed(2)}
-                    </p>
-
-                    <p>
-                        Surplus/Deficit:
-                        ${dynamic_summary.surplus_deficit.toFixed(2)}
-                    </p>
-
                 </div>
 
-            )}
+                <div className="dashboard-actions">
+                    <button
+                        className="primary-button"
+                        onClick={syncAllAccounts}
+                        disabled={isSyncing}
+                    >
+                        {isSyncing ? "Syncing..." : "Sync All"}
+                    </button>
 
-            <hr />
-
-            {category_spending && (
-                <div>
-                    <h2>Spending by Category</h2>
-
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Category</th>
-                                <th>Reporting Group</th>
-                                <th>Number of Months</th>
-                                <th>Total</th>
-                                <th>Average</th>
-                                <th>Target Amount</th>
-                                <th>Difference</th>
-                                <th>% Diff</th>
-                                <th>Percentage of Income</th>
-                            </tr>
-                        </thead>
-
-                        <tbody>
-                            <tr>
-                                <td>Total Income</td>
-                                <td>Income</td>
-                                <td>{category_spending.months}</td>
-                                <td>${category_spending.income.toFixed(2)}</td>
-                                <td>${(category_spending.income / category_spending.months).toFixed(2)}</td>
-                                <td></td>
-                                <td></td>
-                                <td></td>
-                            </tr>
-                            <tr>
-                                <td colSpan={9}><hr/></td>
-                            </tr>
-                            {category_spending.categories
-                                .filter(cat => cat.reporting_group === 'income')
-                                .map(cat => (
-                                    <tr
-                                        key={cat.category_id}
-                                        onClick={() => openCategoryTransactions(cat.category_id)}
-                                        onKeyDown={(event) => {
-                                            if (event.key === "Enter" || event.key === " ") {
-                                                event.preventDefault()
-                                                openCategoryTransactions(cat.category_id)
-                                            }
-                                        }}
-                                        style={{ cursor: "pointer" }}
-                                        tabIndex={0}
-                                        role="link"
-                                    >
-                                        <td>
-                                            {cat.category_name}
-                                        </td>
-                                        <td>
-                                            {cat.reporting_group}
-                                        </td>
-                                        <td>
-                                            {category_spending.months}
-                                        </td>
-                                        <td>
-                                            ${cat.total.toFixed(2)}
-                                        </td>
-                                        <td>
-                                            ${cat.avg_total.toFixed(2)}
-                                        </td>
-                                        {renderTargetComparisonCells(cat)}
-                                        <td>
-                                            {getPercent(cat.total, category_spending.income, cat.pct_income) === null
-                                                ? "N/A"
-                                                : `${getPercent(cat.total, category_spending.income, cat.pct_income).toFixed(2)}%`
-                                            }
-                                        </td>
-                                    </tr>
-                            ))}
-                            <tr>
-                                <td colSpan={9}><hr/></td>
-                            </tr>
-                            {category_spending.categories
-                                .filter(cat => cat.reporting_group === 'expense')
-                                .map(cat => (
-                                    <tr
-                                        key={cat.category_id}
-                                        onClick={() => openCategoryTransactions(cat.category_id)}
-                                        onKeyDown={(event) => {
-                                            if (event.key === "Enter" || event.key === " ") {
-                                                event.preventDefault()
-                                                openCategoryTransactions(cat.category_id)
-                                            }
-                                        }}
-                                        style={{ cursor: "pointer" }}
-                                        tabIndex={0}
-                                        role="link"
-                                    >
-                                        <td>
-                                            {cat.category_name}
-                                        </td>
-                                        <td>
-                                            {cat.reporting_group}
-                                        </td>
-                                        <td>
-                                            {category_spending.months}
-                                        </td>
-                                        <td>
-                                            ${cat.total.toFixed(2)}
-                                        </td>
-                                        <td>
-                                            ${cat.avg_total.toFixed(2)}
-                                        </td>
-                                        {renderTargetComparisonCells(cat)}
-                                        <td>
-                                            {getPercent(cat.total, category_spending.income, cat.pct_income) === null
-                                                ? "N/A"
-                                                : `${getPercent(cat.total, category_spending.income, cat.pct_income).toFixed(2)}%`
-                                            }
-                                        </td>
-                                    </tr>
-                            ))}
-                            <tr>
-                                <td colSpan={9}><hr/></td>
-                            </tr>
-                            {category_spending.categories
-                                .filter(cat => ['investments', 'savings'].includes(cat.reporting_group))
-                                .map(cat => (
-                                    <tr
-                                        key={cat.category_id}
-                                        onClick={() => openCategoryTransactions(cat.category_id)}
-                                        onKeyDown={(event) => {
-                                            if (event.key === "Enter" || event.key === " ") {
-                                                event.preventDefault()
-                                                openCategoryTransactions(cat.category_id)
-                                            }
-                                        }}
-                                        style={{ cursor: "pointer" }}
-                                        tabIndex={0}
-                                        role="link"
-                                    >
-                                        <td>
-                                            {cat.category_name}
-                                        </td>
-                                        <td>
-                                            {cat.reporting_group}
-                                        </td>
-                                        <td>
-                                            {category_spending.months}
-                                        </td>
-                                        <td>
-                                            ${cat.total.toFixed(2)}
-                                        </td>
-                                        <td>
-                                            ${cat.avg_total.toFixed(2)}
-                                        </td>
-                                        {renderTargetComparisonCells(cat)}
-                                        <td>
-                                            {getPercent(cat.total, category_spending.income, cat.pct_income) === null
-                                                ? "N/A"
-                                                : `${getPercent(cat.total, category_spending.income, cat.pct_income).toFixed(2)}%`
-                                            }
-                                        </td>
-                                    </tr>
-                            ))}
-                            <tr>
-                                <td colSpan={9}><hr/></td>
-                            </tr>
-                            <tr>
-                                <td>Leftover</td>
-                                <td></td>
-                                <td>{category_spending.months}</td>
-                                <td>${category_spending.leftover.toFixed(2)}</td>
-                                <td>${(category_spending.leftover / category_spending.months).toFixed(2)}</td>
-                                <td></td>
-                                <td></td>
-                                <td></td>
-                                <td>{category_spending.income === 0 ? "N/A" : `${((category_spending.leftover / category_spending.income) * 100).toFixed(2)}%`}</td>
-                            </tr>
-                        </tbody>
-                    </table>
-
+                    {syncStatus && (
+                        <p className="sync-status">
+                            {syncStatus}
+                        </p>
+                    )}
                 </div>
-            )}
+            </header>
 
-
-            {/* ACCOUNTS SUMMARY */}
-            <div>
-                <h2>Accounts</h2>
-
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Account</th>
-                            <th>Type</th>
-                            <th>Balance</th>
-                        </tr>
-                    </thead>
-
-                    <tbody>
-                        {accounts.map(acc => (
-                            <tr key={acc.id}>
-                                <td>
-                                    {acc.name}
-                                </td>
-                                <td>
-                                    {acc.type}
-                                </td>
-                                <td>
-                                    {balances?.[acc.id] ?? 0}
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-
-            <hr />
-
-            {/* <h2>Spending by Category</h2>
-
-            <table>
-                <thead>
-                    <tr>
-                        <th>Category</th>
-                        <th>All Time</th>
-                        <th>Avg Monthly</th>
-                        <th>Current Month</th>
-                    </tr>
-                </thead>
-
-                <tbody>
-                    {spending.map(row => (
-                        <tr key={row.category_id}>
-                            <td>{row.category_name}</td>
-                            <td>{row.all_time.toFixed(2)}</td>
-                            <td>{row.avg_monthly.toFixed(2)}</td>
-                            <td>{row.current_month.toFixed(2)}</td>
-                        </tr>
+            <section className="period-panel">
+                <div className="preset-buttons">
+                    {[
+                        ["current_month", "Current Month"],
+                        ["previous_month", "Previous Month"],
+                        ["last_3_months", "Last 3 Months"],
+                        ["last_6_months", "Last 6 Months"],
+                        ["year_to_date", "Year to Date"],
+                        ["manual", "Manual"]
+                    ].map(([value, label]) => (
+                        <button
+                            key={value}
+                            className={periodPreset === value ? "preset-button active" : "preset-button"}
+                            onClick={() => updatePreset(value)}
+                        >
+                            {label}
+                        </button>
                     ))}
-                </tbody>
-            </table> */}
+                </div>
 
-            <hr />
+                <div className="reporting-period-controls">
+                    <label>
+                        Start
+                        <input
+                            type="date"
+                            value={startDate}
+                            onChange={(event) => {
+                                setPeriodPreset("manual")
+                                setStartDate(event.target.value)
+                            }}
+                        />
+                    </label>
 
-            {/* NAVIGATION */}
-            <div>
-                <h2>Navigation</h2>
+                    <label>
+                        End
+                        <input
+                            type="date"
+                            value={endDate}
+                            onChange={(event) => {
+                                setPeriodPreset("manual")
+                                setEndDate(event.target.value)
+                            }}
+                        />
+                    </label>
 
-                <ul>
-                    <li><Link to="/accounts">Accounts</Link></li>
-                    <li><Link to="/transactions">Transactions</Link></li>
-                    <li><Link to="/categories-rules">Categories & Rules</Link></li>
-                    <li><Link to="/import">Import</Link></li>
-                    <li><Link to="/uncategorized">Uncategorized</Link></li>
-                </ul>
+                    <button onClick={() => loadDashboardData()}>
+                        Apply
+                    </button>
+                </div>
+            </section>
+
+            <div className="dashboard-grid">
+                <div className="dashboard-main">
+                    <section className="summary-grid">
+                        {summaryItems.map(([label, amount, signed]) => (
+                            <div
+                                key={label}
+                                className="summary-card"
+                            >
+                                <span>{label}</span>
+                                <strong>{formatMoney(amount, { signed })}</strong>
+                            </div>
+                        ))}
+                    </section>
+
+                    <section className="chart-panel">
+                        <button
+                            className="chart-toggle"
+                            type="button"
+                            onClick={toggleChartSection}
+                            aria-expanded={isChartOpen}
+                        >
+                            <span>Charts</span>
+                            <strong>{isChartOpen ? "Hide" : "Show"}</strong>
+                        </button>
+
+                        {isChartOpen && (
+                            <div className="chart-section">
+                                <div className="chart-toolbar">
+                                    <div className="segmented-control">
+                                        <button
+                                            type="button"
+                                            className={chartMode === "categories" ? "active" : ""}
+                                            onClick={() => setChartMode("categories")}
+                                        >
+                                            Categories
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className={chartMode === "groups" ? "active" : ""}
+                                            onClick={() => setChartMode("groups")}
+                                        >
+                                            Groups
+                                        </button>
+                                    </div>
+
+                                    <span>
+                                        {chartData?.months?.length || 0} month{chartData?.months?.length === 1 ? "" : "s"}
+                                    </span>
+                                </div>
+
+                                <div className="empty-chart-frame">
+                                    <div className="chart-grid-lines" />
+                                    <p>
+                                        Select categories or groups to draw chart lines.
+                                    </p>
+                                </div>
+
+                                <div className="chart-selector">
+                                    {(chartMode === "categories"
+                                        ? chartData?.categories || []
+                                        : chartData?.groups || []
+                                    ).map((item) => {
+                                        const value = chartMode === "categories"
+                                            ? item.category_id
+                                            : item.reporting_group
+                                        const label = chartMode === "categories"
+                                            ? item.category_name
+                                            : getGroupLabel(item.reporting_group)
+                                        const selected = chartMode === "categories"
+                                            ? selectedCategoryIds.includes(value)
+                                            : selectedGroups.includes(value)
+
+                                        return (
+                                            <label key={value}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selected}
+                                                    onChange={() => toggleChartSelection(value)}
+                                                />
+                                                {label}
+                                            </label>
+                                        )
+                                    })}
+                                </div>
+                            </div>
+                        )}
+                    </section>
+
+                    {uncategorizedCount > 0 && (
+                        <Link
+                            to="/uncategorized"
+                            className="uncategorized-alert"
+                        >
+                            {uncategorizedCount} uncategorized transactions need review
+                        </Link>
+                    )}
+
+                    <section className="report-panel">
+                        <div className="section-heading">
+                            <h2>Category Details</h2>
+                            {categorySpending && (
+                                <span>
+                                    {categorySpending.months} month{categorySpending.months === 1 ? "" : "s"}
+                                </span>
+                            )}
+                        </div>
+
+                        <div className="table-wrap">
+                            <table className="finance-table">
+                                <thead>
+                                    <tr>
+                                        <th>Category</th>
+                                        <th>Average Monthly</th>
+                                        <th>Actual</th>
+                                        <th>Expected</th>
+                                        <th>Diff</th>
+                                        <th>% of Income</th>
+                                    </tr>
+                                </thead>
+
+                                <tbody>
+                                    {categoryGroups.map((section) => (
+                                        <Fragment key={section.group}>
+                                            <tr
+                                                className="group-row"
+                                            >
+                                                <td colSpan={6}>
+                                                    {getGroupLabel(section.group)}
+                                                </td>
+                                            </tr>
+
+                                            {section.categories.map((category) => {
+                                                const expected = category.target_amount === null || category.target_amount === undefined
+                                                    ? null
+                                                    : Number(category.target_amount) * Number(categorySpending.months || 1)
+                                                const diff = expected === null
+                                                    ? null
+                                                    : Number(category.total) - expected
+                                                const diffPercent = expected
+                                                    ? (diff / expected) * 100
+                                                    : null
+
+                                                return (
+                                                    <tr
+                                                        key={category.category_id}
+                                                        onClick={() => openCategoryTransactions(category.category_id)}
+                                                        onKeyDown={(event) => {
+                                                            if (event.key === "Enter" || event.key === " ") {
+                                                                event.preventDefault()
+                                                                openCategoryTransactions(category.category_id)
+                                                            }
+                                                        }}
+                                                        className="clickable-row"
+                                                        tabIndex={0}
+                                                        role="link"
+                                                    >
+                                                        <td>{category.category_name}</td>
+                                                        <td>{formatMoney(category.avg_total)}</td>
+                                                        <td>{formatMoney(category.total)}</td>
+                                                        <td>{formatMoney(expected)}</td>
+                                                        <td
+                                                            className="diff-cell"
+                                                            style={getDiffStyle(category, diffPercent)}
+                                                        >
+                                                            {diff === null
+                                                                ? ""
+                                                                : `${formatMoney(diff, { signed: true })} (${formatPercent(diffPercent, { signed: true })})`
+                                                            }
+                                                        </td>
+                                                        <td>{formatPercent(category.pct_income)}</td>
+                                                    </tr>
+                                                )
+                                            })}
+                                        </Fragment>
+                                    ))}
+
+                                    {categorySpending && (
+                                        <tr className="leftover-row">
+                                            <td>Leftover</td>
+                                            <td>{formatMoney(categorySpending.leftover, { signed: true })}</td>
+                                            <td>
+                                                {formatMoney(
+                                                    categorySpending.leftover / Number(categorySpending.months || 1),
+                                                    { signed: true }
+                                                )}
+                                            </td>
+                                            <td></td>
+                                            <td></td>
+                                            <td>
+                                                {categorySpending.income
+                                                    ? formatPercent(
+                                                        (categorySpending.leftover / categorySpending.income) * 100,
+                                                        { signed: true }
+                                                    )
+                                                    : ""
+                                                }
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+                </div>
+
+                <aside className="balance-card">
+                    <div className="section-heading">
+                        <h2>Balances</h2>
+                        <span>{accounts.length}</span>
+                    </div>
+
+                    <strong className="balance-total">
+                        {formatMoney(totalBalance)}
+                    </strong>
+
+                    <div className="balance-list">
+                        {accounts.map((account) => (
+                            <div
+                                key={account.id}
+                                className="balance-row"
+                            >
+                                <span>
+                                    {account.name}
+                                </span>
+                                <strong>
+                                    {formatMoney(balances?.[account.id] ?? 0)}
+                                </strong>
+                            </div>
+                        ))}
+                    </div>
+                </aside>
             </div>
-
-        </div>
+        </main>
     )
 }
 

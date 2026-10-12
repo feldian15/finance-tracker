@@ -21,7 +21,9 @@ import {
     deleteTransaction,
     deleteAccount,
     deleteCategory,
-    deleteRule
+    deleteRule,
+    fetchUncategorizedTransactions,
+    syncTransactions
 } from "./api"
 
 import { Toaster } from "react-hot-toast"
@@ -76,6 +78,7 @@ function App() {
     })
 
     const [rules, setRules] = useState([])
+    const [uncategorizedCount, setUncategorizedCount] = useState(0)
 
     const [newRule, setNewRule] = useState({
         description_pattern: "",
@@ -211,6 +214,7 @@ function App() {
             await loadCategories()
             await loadAccounts()
             await loadRules()
+            await loadUncategorizedCount()
         }
 
         loadInitialData()
@@ -230,46 +234,53 @@ function App() {
         }
     }
 
+    async function loadUncategorizedCount() {
+        try {
+            const data = await fetchUncategorizedTransactions()
+            setUncategorizedCount(data.length)
+        } catch (error) {
+            console.error(error)
+        }
+    }
+
 
     return (
         <>
             <Toaster position="top-right" />
             <BrowserRouter>
 
-                <nav>
+                <nav className="app-nav">
                     <Link to="/">
                         Dashboard
                     </Link>
 
-                    {" | "}
-
-                    <Link to="/uncategorized">
-                        Uncategorized
-                    </Link>
-
-                    {" | "}
-
                     <Link to="/accounts">
                         Accounts
                     </Link>
-                    
-                    {" | "}
 
                     <Link to="/transactions">
                         Transactions
                     </Link>
 
-                    {" | "}
-
                     <Link to="/categories-rules">
                         Categories & Rules
                     </Link>
 
-                    {" | "}
-
                     <Link to="/import">
                         Import
                     </Link>     
+
+                    <Link
+                        to="/uncategorized"
+                        className="nav-alert-link"
+                    >
+                        Uncategorized
+                        {uncategorizedCount > 0 && (
+                            <span className="nav-count">
+                                {uncategorizedCount}
+                            </span>
+                        )}
+                    </Link>
                 </nav>
 
                 <Routes>
@@ -280,6 +291,11 @@ function App() {
                             <DashboardPage
                                 accounts={accounts}
                                 balances={balances}
+                                loadAccounts={loadAccounts}
+                                loadTransactions={loadTransactions}
+                                syncTransactions={syncTransactions}
+                                uncategorizedCount={uncategorizedCount}
+                                refreshUncategorizedCount={loadUncategorizedCount}
                             />
                         }
                     />

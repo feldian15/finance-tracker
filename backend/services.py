@@ -1144,6 +1144,135 @@ def get_category_spending(db, start_date, end_date):
     }
 
 
+def month_key(month_date):
+    return month_date.strftime("%Y-%m")
+
+
+def month_label(month_date):
+    return month_date.strftime("%b %Y")
+
+
+def next_month(month_date):
+    if month_date.month == 12:
+        return date(month_date.year + 1, 1, 1)
+
+    return date(month_date.year, month_date.month + 1, 1)
+
+
+def get_reporting_group_value(reporting_group):
+    value = getattr(reporting_group, "value", reporting_group)
+
+    if isinstance(value, tuple):
+        return value[0]
+
+    return value
+
+
+def empty_month_totals(months):
+    return {
+        month["month"]: 0.0
+        for month in months
+    }
+
+
+def get_dashboard_chart_data(db, start_date, end_date):
+    month_start = date(start_date.year, start_date.month, 1)
+    final_month = date(end_date.year, end_date.month, 1)
+    month_dates = []
+
+    while month_start <= final_month:
+        month_dates.append(month_start)
+        month_start = next_month(month_start)
+
+    months = [
+        {
+            "month": month_key(month_date),
+            "label": month_label(month_date)
+        }
+        for month_date in month_dates
+    ]
+
+    categories = (
+        db.query(models.Category)
+        .filter(models.Category.reporting_group != models.ReportingGroup.SYSTEM)
+        .order_by(models.Category.reporting_group, models.Category.name)
+        .all()
+    )
+
+    totals_by_category = {
+        category.id: empty_month_totals(months)
+        for category in categories
+    }
+    totals_by_group = {}
+
+    rows = (
+        db.query(models.Transaction)
+        .join(models.Category)
+        .filter(
+            models.Transaction.date >= start_date,
+            models.Transaction.date <= end_date,
+            models.Category.reporting_group != models.ReportingGroup.SYSTEM,
+        )
+        .all()
+    )
+
+    for txn in rows:
+        key = month_key(date(txn.date.year, txn.date.month, 1))
+        total = abs(float(txn.amount or 0))
+        group = get_reporting_group_value(txn.category.reporting_group)
+
+        if txn.category_id not in totals_by_category:
+            continue
+
+        totals_by_category[txn.category_id][key] += total
+
+        if group not in totals_by_group:
+            totals_by_group[group] = empty_month_totals(months)
+
+        totals_by_group[group][key] += total
+
+    category_series = []
+
+    for category in categories:
+        group = get_reporting_group_value(category.reporting_group)
+        if group not in totals_by_group:
+            totals_by_group[group] = empty_month_totals(months)
+
+        category_series.append({
+            "category_id": category.id,
+            "category_name": category.name,
+            "reporting_group": group,
+            "target_amount": category.target_amount,
+            "series": [
+                {
+                    "month": month["month"],
+                    "total": round(totals_by_category[category.id][month["month"]], 2)
+                }
+                for month in months
+            ]
+        })
+
+    group_series = [
+        {
+            "reporting_group": group,
+            "series": [
+                {
+                    "month": month["month"],
+                    "total": round(totals[month["month"]], 2)
+                }
+                for month in months
+            ]
+        }
+        for group, totals in sorted(totals_by_group.items())
+    ]
+
+    return {
+        "months": months,
+        "categories": category_series,
+        "groups": group_series
+    }
+
+
 
 
 def ensure_system_categories(db):

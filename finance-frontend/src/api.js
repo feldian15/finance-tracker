@@ -416,7 +416,7 @@ export async function fetchDashboardSummary() {
         throw new Error("Failed to fetch dashboard summary")
     }
 
-    return response.json();
+    return response.json()
 }
 
 
@@ -478,6 +478,38 @@ export async function fetchCategorySpending(
 
     if (!response.ok) {
         throw new Error("failed to fetch category spending")
+    }
+
+    return response.json();
+}
+
+
+export async function fetchDashboardChartData(
+    start_date,
+    end_date
+) {
+    const params = new URLSearchParams()
+
+    if (start_date) {
+        params.append(
+            "start_date",
+            start_date
+        )
+    }
+
+    if (end_date) {
+        params.append(
+            "end_date",
+            end_date
+        )
+    }
+
+    const response = await fetch(
+        `${API_BASE}/dashboard/chart_data?${params}`
+    )
+
+    if (!response.ok) {
+        throw new Error("failed to fetch dashboard chart data")
     }
 
     return response.json();
