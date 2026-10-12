@@ -43,6 +43,11 @@ _Avoid_: Prorated target, daily target
 The monthly target reference line shown while hovering a dashboard chart series. For a category series this is the category's target amount, and for a reporting group series this is the sum of target amounts for all categories in that reporting group.
 _Avoid_: Expected line, threshold budget
 
+## Average Line
+
+The reference line shown while hovering a dashboard chart series, calculated from the visible monthly points for that series.
+_Avoid_: Mean guide, baseline
+
 ## Favorability
 
 Whether a category's actual amount is better or worse than its expected amount for the selected dashboard reporting period. Lower spending is favorable for expenses, while higher contributions are favorable for savings and investments.

@@ -413,6 +413,28 @@ h2 {
     stroke-width: 3;
 }
 
+.chart-line:hover,
+.chart-line:focus {
+    stroke-width: 4;
+    outline: none;
+}
+
+.chart-reference-line {
+    pointer-events: none;
+    stroke: var(--text-muted);
+    stroke-width: 1.5;
+}
+
+.chart-reference-line-target {
+    stroke-dasharray: 6 5;
+    opacity: 0.58;
+}
+
+.chart-reference-line-average {
+    stroke-dasharray: 2 5;
+    opacity: 0.36;
+}
+
 .chart-selector {
     position: relative;
     padding: 0 14px 14px;
@@ -467,6 +489,7 @@ h2 {
     display: inline-flex;
     align-items: center;
     gap: 6px;
+    min-height: 24px;
     color: var(--text-muted);
     font-size: 13px;
     font-weight: 700;

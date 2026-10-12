@@ -189,18 +189,38 @@ function buildLinePoints(series, maxTotal) {
     }
 
     if (series.length === 1) {
-        const y = 190 - ((Number(series[0].total) / maxTotal) * 160)
+        const y = getChartY(series[0].total, maxTotal)
         return `40,${y} 320,${y}`
     }
 
     return series
         .map((point, index) => {
             const x = 40 + ((index / (series.length - 1)) * 280)
-            const y = 190 - ((Number(point.total) / maxTotal) * 160)
+            const y = getChartY(point.total, maxTotal)
 
             return `${x},${y}`
         })
         .join(" ")
+}
+
+function getChartY(total, maxTotal) {
+    return 190 - ((Number(total) / maxTotal) * 160)
+}
+
+function getAverageTotal(series) {
+    if (!series.length) {
+        return 0
+    }
+
+    const total = series.reduce((sum, point) => (
+        sum + Number(point.total)
+    ), 0)
+
+    return total / series.length
+}
+
+function hasTargetThreshold(category) {
+    return category?.target_threshold !== null && category?.target_threshold !== undefined
 }
 
 function DashboardPage({
@@ -228,6 +248,7 @@ function DashboardPage({
     const [selectedCategoryIds, setSelectedCategoryIds] = useState([])
     const [selectedGroups, setSelectedGroups] = useState([])
     const [chartData, setChartData] = useState(null)
+    const [hoveredCategoryId, setHoveredCategoryId] = useState(null)
 
     const totalBalance = accounts.reduce((sum, account) => {
         return sum + Number(balances?.[account.id] ?? 0)
@@ -265,10 +286,32 @@ function DashboardPage({
         const totals = selectedCategorySeries.flatMap((category) => (
             category.series.map((point) => Number(point.total))
         ))
+
+        selectedCategorySeries.forEach((category) => {
+            totals.push(getAverageTotal(category.series))
+
+            if (hasTargetThreshold(category)) {
+                totals.push(Number(category.target_threshold))
+            }
+        })
+
         const maxTotal = Math.max(0, ...totals)
 
         return maxTotal || 1
     }, [selectedCategorySeries])
+
+    const hoveredCategorySeries = selectedCategorySeries.find((category) => (
+        category.category_id === hoveredCategoryId
+    ))
+    const hoveredCategoryAverageTotal = hoveredCategorySeries
+        ? getAverageTotal(hoveredCategorySeries.series)
+        : null
+    const hoveredCategoryTargetY = hasTargetThreshold(hoveredCategorySeries)
+        ? getChartY(hoveredCategorySeries.target_threshold, selectedCategoryChartMaxTotal)
+        : null
+    const hoveredCategoryAverageY = hoveredCategoryAverageTotal !== null
+        ? getChartY(hoveredCategoryAverageTotal, selectedCategoryChartMaxTotal)
+        : null
 
     function openCategoryTransactions(categoryId) {
         if (!categoryId) return
@@ -603,12 +646,37 @@ function DashboardPage({
                                             y2="190"
                                         />
 
+                                        {hoveredCategoryTargetY !== null && (
+                                            <line
+                                                className="chart-reference-line chart-reference-line-target"
+                                                x1="40"
+                                                y1={hoveredCategoryTargetY}
+                                                x2="320"
+                                                y2={hoveredCategoryTargetY}
+                                            />
+                                        )}
+
+                                        {hoveredCategoryAverageY !== null && (
+                                            <line
+                                                className="chart-reference-line chart-reference-line-average"
+                                                x1="40"
+                                                y1={hoveredCategoryAverageY}
+                                                x2="320"
+                                                y2={hoveredCategoryAverageY}
+                                            />
+                                        )}
+
                                         {selectedCategorySeries.map((category, index) => (
                                             <polyline
                                                 key={category.category_id}
                                                 className="chart-line"
                                                 points={buildLinePoints(category.series, selectedCategoryChartMaxTotal)}
                                                 stroke={getCategoryColor(index)}
+                                                onMouseEnter={() => setHoveredCategoryId(category.category_id)}
+                                                onMouseLeave={() => setHoveredCategoryId(null)}
+                                                onFocus={() => setHoveredCategoryId(category.category_id)}
+                                                onBlur={() => setHoveredCategoryId(null)}
+                                                tabIndex={0}
                                             />
                                         ))}
                                     </svg>
@@ -641,7 +709,19 @@ function DashboardPage({
                                             : selectedGroups.includes(value)
 
                                         return (
-                                            <label key={value}>
+                                            <label
+                                                key={value}
+                                                onMouseEnter={() => {
+                                                    if (chartMode === "categories" && selected) {
+                                                        setHoveredCategoryId(value)
+                                                    }
+                                                }}
+                                                onMouseLeave={() => {
+                                                    if (chartMode === "categories" && selected) {
+                                                        setHoveredCategoryId(null)
+                                                    }
+                                                }}
+                                            >
                                                 <input
                                                     type="checkbox"
                                                     checked={selected}
@@ -657,7 +737,11 @@ function DashboardPage({
                                 {selectedCategorySeries.length > 0 && (
                                     <div className="chart-legend">
                                         {selectedCategorySeries.map((category, index) => (
-                                            <span key={category.category_id}>
+                                            <span
+                                                key={category.category_id}
+                                                onMouseEnter={() => setHoveredCategoryId(category.category_id)}
+                                                onMouseLeave={() => setHoveredCategoryId(null)}
+                                            >
                                                 <i style={{ backgroundColor: getCategoryColor(index) }} />
                                                 {category.category_name}
                                             </span>

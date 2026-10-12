@@ -1259,6 +1259,11 @@ def get_dashboard_chart_data(db, start_date, end_date):
             "category_name": category.name,
             "reporting_group": group,
             "target_amount": category.target_amount,
+            "target_threshold": (
+                category.target_amount
+                if has_nonzero_target_amount(category)
+                else None
+            ),
             "series": [
                 {
                     "month": month["month"],
