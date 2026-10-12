@@ -6,6 +6,8 @@ import unittest
 from cryptography.fernet import Fernet
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, inspect, text
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
 
 class CategoryTargetAmountTest(unittest.TestCase):
@@ -27,13 +29,36 @@ class CategoryTargetAmountTest(unittest.TestCase):
         )
 
         import main
+        import models
 
         cls.client = TestClient(main.app)
+        cls.engine = create_engine(
+            "sqlite:///:memory:",
+            connect_args={"check_same_thread": False},
+            poolclass=StaticPool,
+        )
+        cls.testing_session_factory = sessionmaker(bind=cls.engine)
+        cls.models = models
+        cls.main = main
+
+        def override_get_db():
+            db = cls.testing_session_factory()
+            try:
+                yield db
+            finally:
+                db.close()
+
+        main.app.dependency_overrides[main.get_db] = override_get_db
 
     @classmethod
     def tearDownClass(cls):
+        cls.main.app.dependency_overrides.clear()
         os.chdir(cls._cwd)
         cls._tmpdir.cleanup()
+
+    def setUp(self):
+        self.models.Base.metadata.drop_all(bind=self.engine)
+        self.models.Base.metadata.create_all(bind=self.engine)
 
     def test_create_read_and_update_category_target_amount(self):
         response = self.client.post(
