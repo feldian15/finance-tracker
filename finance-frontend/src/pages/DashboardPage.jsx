@@ -116,6 +116,29 @@ function formatPercent(percent, options = {}) {
     return formatted
 }
 
+function formatCompactMoney(amount) {
+    if (amount === null || amount === undefined) {
+        return ""
+    }
+
+    const value = Number(amount)
+
+    if (Math.abs(value) >= 1000) {
+        return value.toLocaleString("en-US", {
+            style: "currency",
+            currency: "USD",
+            notation: "compact",
+            maximumFractionDigits: 1
+        })
+    }
+
+    return value.toLocaleString("en-US", {
+        style: "currency",
+        currency: "USD",
+        maximumFractionDigits: 0
+    })
+}
+
 function getFavorability(category, diffPercent) {
     if (!diffPercent) {
         return "neutral"
@@ -207,6 +230,35 @@ function getChartY(total, maxTotal) {
     return 190 - ((Number(total) / maxTotal) * 160)
 }
 
+function clampChartY(y) {
+    return Math.max(22, Math.min(202, y))
+}
+
+function getChartReferenceY(total, maxTotal) {
+    return clampChartY(getChartY(total, maxTotal))
+}
+
+function getReferenceLabelYs(targetY, averageY) {
+    if (targetY === null || averageY === null) {
+        return {
+            targetLabelY: targetY === null ? null : clampChartY(targetY - 8),
+            averageLabelY: averageY === null ? null : clampChartY(averageY + 14)
+        }
+    }
+
+    if (Math.abs(targetY - averageY) < 18) {
+        return {
+            targetLabelY: clampChartY(targetY - 14),
+            averageLabelY: clampChartY(averageY + 18)
+        }
+    }
+
+    return {
+        targetLabelY: clampChartY(targetY - 8),
+        averageLabelY: clampChartY(averageY + 14)
+    }
+}
+
 function getAverageTotal(series) {
     if (!series.length) {
         return 0
@@ -282,19 +334,10 @@ function DashboardPage({
         ))
     }, [chartData, chartMode, selectedCategoryIds])
 
-    const selectedCategoryChartMaxTotal = useMemo(() => {
+    const selectedCategoryActualMaxTotal = useMemo(() => {
         const totals = selectedCategorySeries.flatMap((category) => (
             category.series.map((point) => Number(point.total))
         ))
-
-        selectedCategorySeries.forEach((category) => {
-            totals.push(getAverageTotal(category.series))
-
-            if (hasTargetThreshold(category)) {
-                totals.push(Number(category.target_threshold))
-            }
-        })
-
         const maxTotal = Math.max(0, ...totals)
 
         return maxTotal || 1
@@ -307,11 +350,25 @@ function DashboardPage({
         ? getAverageTotal(hoveredCategorySeries.series)
         : null
     const hoveredCategoryTargetY = hasTargetThreshold(hoveredCategorySeries)
-        ? getChartY(hoveredCategorySeries.target_threshold, selectedCategoryChartMaxTotal)
+        ? getChartReferenceY(hoveredCategorySeries.target_threshold, selectedCategoryActualMaxTotal)
         : null
     const hoveredCategoryAverageY = hoveredCategoryAverageTotal !== null
-        ? getChartY(hoveredCategoryAverageTotal, selectedCategoryChartMaxTotal)
+        ? getChartReferenceY(hoveredCategoryAverageTotal, selectedCategoryActualMaxTotal)
         : null
+    const { targetLabelY, averageLabelY } = getReferenceLabelYs(
+        hoveredCategoryTargetY,
+        hoveredCategoryAverageY
+    )
+    const chartScaleTicks = selectedCategorySeries.length > 0
+        ? [
+            selectedCategoryActualMaxTotal,
+            selectedCategoryActualMaxTotal / 2,
+            0
+        ].map((value) => ({
+            value,
+            y: getChartY(value, selectedCategoryActualMaxTotal)
+        }))
+        : []
 
     function openCategoryTransactions(categoryId) {
         if (!categoryId) return
@@ -631,6 +688,17 @@ function DashboardPage({
                                                 />
                                             ))}
                                         </g>
+                                        <g className="chart-scale">
+                                            {chartScaleTicks.map((tick) => (
+                                                <text
+                                                    key={tick.value}
+                                                    x="34"
+                                                    y={tick.y}
+                                                >
+                                                    {formatCompactMoney(tick.value)}
+                                                </text>
+                                            ))}
+                                        </g>
                                         <line
                                             className="chart-axis"
                                             x1="40"
@@ -647,30 +715,48 @@ function DashboardPage({
                                         />
 
                                         {hoveredCategoryTargetY !== null && (
-                                            <line
-                                                className="chart-reference-line chart-reference-line-target"
-                                                x1="40"
-                                                y1={hoveredCategoryTargetY}
-                                                x2="320"
-                                                y2={hoveredCategoryTargetY}
-                                            />
+                                            <>
+                                                <line
+                                                    className="chart-reference-line chart-reference-line-target"
+                                                    x1="40"
+                                                    y1={hoveredCategoryTargetY}
+                                                    x2="320"
+                                                    y2={hoveredCategoryTargetY}
+                                                />
+                                                <text
+                                                    className="chart-reference-label chart-reference-label-target"
+                                                    x="316"
+                                                    y={targetLabelY}
+                                                >
+                                                    Target Threshold {formatCompactMoney(hoveredCategorySeries.target_threshold)}
+                                                </text>
+                                            </>
                                         )}
 
                                         {hoveredCategoryAverageY !== null && (
-                                            <line
-                                                className="chart-reference-line chart-reference-line-average"
-                                                x1="40"
-                                                y1={hoveredCategoryAverageY}
-                                                x2="320"
-                                                y2={hoveredCategoryAverageY}
-                                            />
+                                            <>
+                                                <line
+                                                    className="chart-reference-line chart-reference-line-average"
+                                                    x1="40"
+                                                    y1={hoveredCategoryAverageY}
+                                                    x2="320"
+                                                    y2={hoveredCategoryAverageY}
+                                                />
+                                                <text
+                                                    className="chart-reference-label chart-reference-label-average"
+                                                    x="316"
+                                                    y={averageLabelY}
+                                                >
+                                                    Average Line {formatCompactMoney(hoveredCategoryAverageTotal)}
+                                                </text>
+                                            </>
                                         )}
 
                                         {selectedCategorySeries.map((category, index) => (
                                             <polyline
                                                 key={category.category_id}
                                                 className="chart-line"
-                                                points={buildLinePoints(category.series, selectedCategoryChartMaxTotal)}
+                                                points={buildLinePoints(category.series, selectedCategoryActualMaxTotal)}
                                                 stroke={getCategoryColor(index)}
                                                 onMouseEnter={() => setHoveredCategoryId(category.category_id)}
                                                 onMouseLeave={() => setHoveredCategoryId(null)}
