@@ -42,12 +42,18 @@ class DashboardChartDataTest(unittest.TestCase):
 
         return account
 
-    def create_category(self, category_id, name, reporting_group):
+    def create_category(
+        self,
+        category_id,
+        name,
+        reporting_group,
+        target_amount=100,
+    ):
         category = models.Category(
             id=category_id,
             name=name,
             reporting_group=reporting_group,
-            target_amount=100,
+            target_amount=target_amount,
         )
 
         self.db.add(category)
@@ -187,6 +193,71 @@ class DashboardChartDataTest(unittest.TestCase):
                 {"month": "2026-02", "total": 1200.0},
             ],
         )
+
+    def test_category_chart_data_includes_only_active_or_targeted_categories(self):
+        account = self.create_account()
+        active = self.create_category(
+            "ACTIVE",
+            "Active",
+            models.ReportingGroup.EXPENSE,
+            target_amount=None,
+        )
+        has_target_amount = self.create_category(
+            "HAS_TARGET_AMOUNT",
+            "Has Target Amount",
+            models.ReportingGroup.EXPENSE,
+            target_amount=50,
+        )
+        zero_target_amount_idle = self.create_category(
+            "ZERO_TARGET_AMOUNT_IDLE",
+            "Zero Target Amount Idle",
+            models.ReportingGroup.EXPENSE,
+            target_amount=0,
+        )
+        no_target_idle = self.create_category(
+            "NO_TARGET_IDLE",
+            "No Target Idle",
+            models.ReportingGroup.EXPENSE,
+            target_amount=None,
+        )
+        outside_period = self.create_category(
+            "OUTSIDE_PERIOD",
+            "Outside Period",
+            models.ReportingGroup.EXPENSE,
+            target_amount=None,
+        )
+
+        self.create_transaction(
+            "ACTIVE_TXN",
+            account.id,
+            active.id,
+            -30,
+            datetime.date(2026, 1, 10),
+        )
+        self.create_transaction(
+            "OUTSIDE_TXN",
+            account.id,
+            outside_period.id,
+            -40,
+            datetime.date(2026, 2, 10),
+        )
+
+        result = services.get_dashboard_chart_data(
+            self.db,
+            start_date=datetime.date(2026, 1, 1),
+            end_date=datetime.date(2026, 1, 31),
+        )
+
+        category_ids = [
+            category["category_id"]
+            for category in result["categories"]
+        ]
+
+        self.assertIn(active.id, category_ids)
+        self.assertIn(has_target_amount.id, category_ids)
+        self.assertNotIn(zero_target_amount_idle.id, category_ids)
+        self.assertNotIn(no_target_idle.id, category_ids)
+        self.assertNotIn(outside_period.id, category_ids)
 
 
 if __name__ == "__main__":

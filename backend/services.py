@@ -1175,6 +1175,17 @@ def empty_month_totals(months):
     }
 
 
+def has_nonzero_monthly_total(totals):
+    return any(
+        abs(total) > 0
+        for total in totals.values()
+    )
+
+
+def has_nonzero_target_amount(category):
+    return category.target_amount is not None and abs(category.target_amount) > 0
+
+
 def get_dashboard_chart_data(db, start_date, end_date):
     month_start = date(start_date.year, start_date.month, 1)
     final_month = date(end_date.year, end_date.month, 1)
@@ -1235,8 +1246,13 @@ def get_dashboard_chart_data(db, start_date, end_date):
 
     for category in categories:
         group = get_reporting_group_value(category.reporting_group)
+        category_totals = totals_by_category[category.id]
+
         if group not in totals_by_group:
             totals_by_group[group] = empty_month_totals(months)
+
+        if not has_nonzero_monthly_total(category_totals) and not has_nonzero_target_amount(category):
+            continue
 
         category_series.append({
             "category_id": category.id,
@@ -1246,7 +1262,7 @@ def get_dashboard_chart_data(db, start_date, end_date):
             "series": [
                 {
                     "month": month["month"],
-                    "total": round(totals_by_category[category.id][month["month"]], 2)
+                    "total": round(category_totals[month["month"]], 2)
                 }
                 for month in months
             ]

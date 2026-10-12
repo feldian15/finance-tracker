@@ -362,10 +362,8 @@ h2 {
     box-shadow: 0 1px 4px rgba(39, 48, 47, 0.08);
 }
 
-.empty-chart-frame {
+.chart-frame {
     position: relative;
-    display: grid;
-    place-items: center;
     min-height: 230px;
     margin: 0 14px 12px;
     border: 1px solid var(--border);
@@ -378,7 +376,17 @@ h2 {
     overflow: hidden;
 }
 
-.empty-chart-frame p {
+.chart-frame svg {
+    display: block;
+    width: 100%;
+    min-height: 230px;
+}
+
+.chart-frame p {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
     padding: 8px 10px;
     border: 1px solid var(--border);
     border-radius: 6px;
@@ -388,22 +396,49 @@ h2 {
     font-weight: 700;
 }
 
-.chart-grid-lines {
-    position: absolute;
-    inset: 0;
-    border-left: 1px solid var(--border-strong);
-    border-bottom: 1px solid var(--border-strong);
-    pointer-events: none;
+.chart-grid line {
+    stroke: var(--border);
+    stroke-width: 1;
+}
+
+.chart-axis {
+    stroke: var(--border-strong);
+    stroke-width: 1.5;
+}
+
+.chart-line {
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 3;
 }
 
 .chart-selector {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
+    position: relative;
     padding: 0 14px 14px;
 }
 
-.chart-selector label {
+.chart-selector summary {
+    display: inline-flex;
+    align-items: center;
+    min-height: 34px;
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.chart-selector-menu {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+}
+
+.chart-selector-menu label {
     display: inline-flex;
     align-items: center;
     gap: 6px;
@@ -416,9 +451,32 @@ h2 {
     font-weight: 650;
 }
 
-.chart-selector input {
+.chart-selector-menu input {
     min-height: auto;
     padding: 0;
+}
+
+.chart-legend {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 0 14px 14px;
+}
+
+.chart-legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.chart-legend i {
+    display: block;
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
 }
 
 .section-heading {

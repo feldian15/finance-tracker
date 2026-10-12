@@ -170,6 +170,39 @@ function shouldShowCategory(category) {
     return hasExpected || hasActual
 }
 
+function getCategoryColor(index) {
+    const colors = [
+        "#2f6f73",
+        "#b85c38",
+        "#5f6fb8",
+        "#8a6a2f",
+        "#7a4c8f",
+        "#397a4f"
+    ]
+
+    return colors[index % colors.length]
+}
+
+function buildLinePoints(series, maxTotal) {
+    if (!series.length) {
+        return ""
+    }
+
+    if (series.length === 1) {
+        const y = 190 - ((Number(series[0].total) / maxTotal) * 160)
+        return `40,${y} 320,${y}`
+    }
+
+    return series
+        .map((point, index) => {
+            const x = 40 + ((index / (series.length - 1)) * 280)
+            const y = 190 - ((Number(point.total) / maxTotal) * 160)
+
+            return `${x},${y}`
+        })
+        .join(" ")
+}
+
 function DashboardPage({
     accounts,
     balances,
@@ -217,6 +250,25 @@ function DashboardPage({
             }))
             .filter((section) => section.categories.length > 0)
     }, [categorySpending])
+
+    const selectedCategorySeries = useMemo(() => {
+        if (chartMode !== "categories" || !chartData?.categories) {
+            return []
+        }
+
+        return chartData.categories.filter((category) => (
+            selectedCategoryIds.includes(category.category_id)
+        ))
+    }, [chartData, chartMode, selectedCategoryIds])
+
+    const selectedCategoryChartMaxTotal = useMemo(() => {
+        const totals = selectedCategorySeries.flatMap((category) => (
+            category.series.map((point) => Number(point.total))
+        ))
+        const maxTotal = Math.max(0, ...totals)
+
+        return maxTotal || 1
+    }, [selectedCategorySeries])
 
     function openCategoryTransactions(categoryId) {
         if (!categoryId) return
@@ -519,14 +571,61 @@ function DashboardPage({
                                     </span>
                                 </div>
 
-                                <div className="empty-chart-frame">
-                                    <div className="chart-grid-lines" />
-                                    <p>
-                                        Select categories or groups to draw chart lines.
-                                    </p>
+                                <div className="chart-frame">
+                                    <svg
+                                        viewBox="0 0 360 220"
+                                        role="img"
+                                        aria-label="Monthly actual category chart"
+                                    >
+                                        <g className="chart-grid">
+                                            {[30, 70, 110, 150, 190].map((y) => (
+                                                <line
+                                                    key={y}
+                                                    x1="40"
+                                                    y1={y}
+                                                    x2="320"
+                                                    y2={y}
+                                                />
+                                            ))}
+                                        </g>
+                                        <line
+                                            className="chart-axis"
+                                            x1="40"
+                                            y1="30"
+                                            x2="40"
+                                            y2="190"
+                                        />
+                                        <line
+                                            className="chart-axis"
+                                            x1="40"
+                                            y1="190"
+                                            x2="320"
+                                            y2="190"
+                                        />
+
+                                        {selectedCategorySeries.map((category, index) => (
+                                            <polyline
+                                                key={category.category_id}
+                                                className="chart-line"
+                                                points={buildLinePoints(category.series, selectedCategoryChartMaxTotal)}
+                                                stroke={getCategoryColor(index)}
+                                            />
+                                        ))}
+                                    </svg>
+
+                                    {selectedCategorySeries.length === 0 && (
+                                        <p>
+                                            Select categories or groups to draw chart lines.
+                                        </p>
+                                    )}
                                 </div>
 
-                                <div className="chart-selector">
+                                <details className="chart-selector">
+                                    <summary>
+                                        {chartMode === "categories" ? "Select Categories" : "Select Groups"}
+                                    </summary>
+
+                                    <div className="chart-selector-menu">
                                     {(chartMode === "categories"
                                         ? chartData?.categories || []
                                         : chartData?.groups || []
@@ -552,7 +651,19 @@ function DashboardPage({
                                             </label>
                                         )
                                     })}
-                                </div>
+                                    </div>
+                                </details>
+
+                                {selectedCategorySeries.length > 0 && (
+                                    <div className="chart-legend">
+                                        {selectedCategorySeries.map((category, index) => (
+                                            <span key={category.category_id}>
+                                                <i style={{ backgroundColor: getCategoryColor(index) }} />
+                                                {category.category_name}
+                                            </span>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         )}
                     </section>
