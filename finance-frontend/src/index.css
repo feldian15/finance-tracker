@@ -398,67 +398,114 @@ h2 {
 
 .chart-grid line {
     stroke: var(--border);
-    stroke-width: 1;
+    stroke-width: 0.8;
 }
 
-.chart-scale text {
+.chart-scale text,
+.chart-month-labels text {
     fill: var(--text-muted);
     font-size: 11px;
     font-weight: 700;
+}
+
+.chart-scale text {
     text-anchor: end;
     dominant-baseline: middle;
 }
 
+.chart-month-labels text {
+    text-anchor: middle;
+    dominant-baseline: hanging;
+}
+
 .chart-axis {
     stroke: var(--border-strong);
-    stroke-width: 1.5;
+    stroke-width: 1;
 }
 
 .chart-line {
     fill: none;
     stroke-linecap: round;
     stroke-linejoin: round;
-    stroke-width: 3;
+    stroke-width: 2;
+}
+
+.chart-line-hit {
+    fill: none;
+    pointer-events: stroke;
+    stroke: transparent;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 12;
 }
 
 .chart-line:hover,
 .chart-line:focus {
-    stroke-width: 4;
+    stroke-width: 2.5;
     outline: none;
+}
+
+.chart-point {
+    opacity: 0;
+    outline: none;
+    stroke: #fbfcfa;
+    stroke-width: 2;
+}
+
+.chart-point:hover,
+.chart-point:focus {
+    opacity: 1;
 }
 
 .chart-reference-line {
     pointer-events: none;
     stroke: var(--text-muted);
-    stroke-width: 1.5;
+    stroke-width: 1;
 }
 
 .chart-reference-line-target {
     stroke-dasharray: 6 5;
-    opacity: 0.58;
+    opacity: 0.5;
 }
 
 .chart-reference-line-average {
     stroke-dasharray: 2 5;
-    opacity: 0.36;
+    opacity: 0.28;
 }
 
-.chart-reference-label {
-    fill: var(--text-muted);
-    font-size: 11px;
+.chart-hover-card {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    display: grid;
+    gap: 6px;
+    min-width: 160px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.94);
+    box-shadow: 0 8px 22px rgba(39, 48, 47, 0.12);
+    color: var(--text);
+    font-size: 12px;
+    pointer-events: none;
+}
+
+.chart-hover-card strong {
+    font-size: 13px;
+}
+
+.chart-hover-card span {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    color: var(--text-muted);
+    font-weight: 700;
+}
+
+.chart-hover-card b {
+    color: var(--text);
     font-weight: 800;
-    paint-order: stroke;
-    stroke: rgba(255, 255, 255, 0.9);
-    stroke-width: 4;
-    text-anchor: end;
-}
-
-.chart-reference-label-target {
-    opacity: 0.82;
-}
-
-.chart-reference-label-average {
-    opacity: 0.62;
 }
 
 .chart-selector {
