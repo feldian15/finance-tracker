@@ -1215,6 +1215,7 @@ def get_dashboard_chart_data(db, start_date, end_date):
         for category in categories
     }
     totals_by_group = {}
+    target_thresholds_by_group = {}
 
     rows = (
         db.query(models.Transaction)
@@ -1251,6 +1252,12 @@ def get_dashboard_chart_data(db, start_date, end_date):
         if group not in totals_by_group:
             totals_by_group[group] = empty_month_totals(months)
 
+        if group not in target_thresholds_by_group:
+            target_thresholds_by_group[group] = 0.0
+
+        if has_nonzero_target_amount(category):
+            target_thresholds_by_group[group] += float(category.target_amount)
+
         if not has_nonzero_monthly_total(category_totals) and not has_nonzero_target_amount(category):
             continue
 
@@ -1276,6 +1283,11 @@ def get_dashboard_chart_data(db, start_date, end_date):
     group_series = [
         {
             "reporting_group": group,
+            "target_threshold": (
+                round(target_thresholds_by_group.get(group, 0.0), 2)
+                if abs(target_thresholds_by_group.get(group, 0.0)) > 0
+                else None
+            ),
             "series": [
                 {
                     "month": month["month"],

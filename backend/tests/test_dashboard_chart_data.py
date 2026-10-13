@@ -389,6 +389,90 @@ class DashboardChartDataTest(unittest.TestCase):
             ],
         )
 
+    def test_reporting_group_chart_data_sums_target_thresholds(self):
+        account = self.create_account()
+        groceries = self.create_category(
+            "GROCERIES",
+            "Groceries",
+            models.ReportingGroup.EXPENSE,
+            target_amount=300,
+        )
+        utilities = self.create_category(
+            "UTILITIES",
+            "Utilities",
+            models.ReportingGroup.EXPENSE,
+            target_amount=125.50,
+        )
+        dining = self.create_category(
+            "DINING",
+            "Dining",
+            models.ReportingGroup.EXPENSE,
+            target_amount=0,
+        )
+        paychecks = self.create_category(
+            "PAYCHECKS",
+            "Paychecks",
+            models.ReportingGroup.INCOME,
+            target_amount=None,
+        )
+        internal_transfer = self.create_category(
+            "INTERNAL_TRANSFER",
+            "Internal Transfer",
+            models.ReportingGroup.SYSTEM,
+            target_amount=999,
+        )
+
+        self.create_transaction(
+            "JAN_GROCERY",
+            account.id,
+            groceries.id,
+            -30,
+            datetime.date(2026, 1, 5),
+        )
+        self.create_transaction(
+            "JAN_UTILITIES",
+            account.id,
+            utilities.id,
+            -40,
+            datetime.date(2026, 1, 10),
+        )
+        self.create_transaction(
+            "JAN_DINING",
+            account.id,
+            dining.id,
+            -20,
+            datetime.date(2026, 1, 12),
+        )
+        self.create_transaction(
+            "JAN_PAYCHECK",
+            account.id,
+            paychecks.id,
+            1500,
+            datetime.date(2026, 1, 15),
+        )
+        self.create_transaction(
+            "SYSTEM_TXN",
+            account.id,
+            internal_transfer.id,
+            -999,
+            datetime.date(2026, 1, 20),
+        )
+
+        result = services.get_dashboard_chart_data(
+            self.db,
+            start_date=datetime.date(2026, 1, 1),
+            end_date=datetime.date(2026, 1, 31),
+        )
+
+        groups = {
+            group["reporting_group"]: group
+            for group in result["groups"]
+        }
+
+        self.assertEqual(groups["expense"]["target_threshold"], 425.50)
+        self.assertIsNone(groups["income"]["target_threshold"])
+        self.assertNotIn("system", groups)
+
 
 if __name__ == "__main__":
     unittest.main()

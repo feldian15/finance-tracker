@@ -355,6 +355,7 @@ function DashboardPage({
             .map((group) => ({
                 id: group.reporting_group,
                 label: getGroupLabel(group.reporting_group),
+                target_threshold: group.target_threshold,
                 series: group.series
             }))
     }, [chartData, chartMode, reportingGroupOptions, selectedCategoryIds, selectedGroups])
