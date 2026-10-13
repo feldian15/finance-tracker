@@ -300,7 +300,7 @@ function DashboardPage({
     const [selectedCategoryIds, setSelectedCategoryIds] = useState([])
     const [selectedGroups, setSelectedGroups] = useState([])
     const [chartData, setChartData] = useState(null)
-    const [hoveredCategoryId, setHoveredCategoryId] = useState(null)
+    const [hoveredSeriesId, setHoveredSeriesId] = useState(null)
 
     const totalBalance = accounts.reduce((sum, account) => {
         return sum + Number(balances?.[account.id] ?? 0)
@@ -324,49 +324,74 @@ function DashboardPage({
             .filter((section) => section.categories.length > 0)
     }, [categorySpending])
 
-    const selectedCategorySeries = useMemo(() => {
-        if (chartMode !== "categories" || !chartData?.categories) {
+    const reportingGroupOptions = useMemo(() => (
+        (chartData?.groups || []).filter((group) => (
+            group.reporting_group !== "system"
+        ))
+    ), [chartData])
+
+    const selectedChartSeries = useMemo(() => {
+        if (!chartData) {
             return []
         }
 
-        return chartData.categories.filter((category) => (
-            selectedCategoryIds.includes(category.category_id)
-        ))
-    }, [chartData, chartMode, selectedCategoryIds])
+        if (chartMode === "categories") {
+            return (chartData.categories || [])
+                .filter((category) => (
+                    selectedCategoryIds.includes(category.category_id)
+                ))
+                .map((category) => ({
+                    id: category.category_id,
+                    label: category.category_name,
+                    target_threshold: category.target_threshold,
+                    series: category.series
+                }))
+        }
 
-    const selectedCategoryActualMaxTotal = useMemo(() => {
-        const totals = selectedCategorySeries.flatMap((category) => (
-            category.series.map((point) => Number(point.total))
+        return reportingGroupOptions
+            .filter((group) => (
+                selectedGroups.includes(group.reporting_group)
+            ))
+            .map((group) => ({
+                id: group.reporting_group,
+                label: getGroupLabel(group.reporting_group),
+                series: group.series
+            }))
+    }, [chartData, chartMode, reportingGroupOptions, selectedCategoryIds, selectedGroups])
+
+    const selectedChartActualMaxTotal = useMemo(() => {
+        const totals = selectedChartSeries.flatMap((item) => (
+            item.series.map((point) => Number(point.total))
         ))
         const maxTotal = Math.max(0, ...totals)
 
         return maxTotal || 1
-    }, [selectedCategorySeries])
+    }, [selectedChartSeries])
 
-    const hoveredCategorySeries = selectedCategorySeries.find((category) => (
-        category.category_id === hoveredCategoryId
+    const hoveredChartSeries = selectedChartSeries.find((item) => (
+        item.id === hoveredSeriesId
     ))
-    const hoveredCategoryAverageTotal = hoveredCategorySeries
-        ? getAverageTotal(hoveredCategorySeries.series)
+    const hoveredChartAverageTotal = hoveredChartSeries
+        ? getAverageTotal(hoveredChartSeries.series)
         : null
-    const hoveredCategoryTargetY = hasTargetThreshold(hoveredCategorySeries)
-        ? getChartReferenceY(hoveredCategorySeries.target_threshold, selectedCategoryActualMaxTotal)
+    const hoveredChartTargetY = hasTargetThreshold(hoveredChartSeries)
+        ? getChartReferenceY(hoveredChartSeries.target_threshold, selectedChartActualMaxTotal)
         : null
-    const hoveredCategoryAverageY = hoveredCategoryAverageTotal !== null
-        ? getChartReferenceY(hoveredCategoryAverageTotal, selectedCategoryActualMaxTotal)
+    const hoveredChartAverageY = hoveredChartAverageTotal !== null
+        ? getChartReferenceY(hoveredChartAverageTotal, selectedChartActualMaxTotal)
         : null
     const { targetLabelY, averageLabelY } = getReferenceLabelYs(
-        hoveredCategoryTargetY,
-        hoveredCategoryAverageY
+        hoveredChartTargetY,
+        hoveredChartAverageY
     )
-    const chartScaleTicks = selectedCategorySeries.length > 0
+    const chartScaleTicks = selectedChartSeries.length > 0
         ? [
-            selectedCategoryActualMaxTotal,
-            selectedCategoryActualMaxTotal / 2,
+            selectedChartActualMaxTotal,
+            selectedChartActualMaxTotal / 2,
             0
         ].map((value) => ({
             value,
-            y: getChartY(value, selectedCategoryActualMaxTotal)
+            y: getChartY(value, selectedChartActualMaxTotal)
         }))
         : []
 
@@ -430,6 +455,7 @@ function DashboardPage({
         setChartMode("categories")
         setSelectedCategoryIds([])
         setSelectedGroups([])
+        setHoveredSeriesId(null)
 
         try {
             const data = await fetchDashboardChartData(startDate, endDate)
@@ -454,6 +480,17 @@ function DashboardPage({
                 ? current.filter((group) => group !== value)
                 : [...current, value]
         ))
+    }
+
+    function selectChartMode(mode) {
+        const isEnteringGroupsMode = mode === "groups" && chartMode !== "groups"
+
+        setChartMode(mode)
+        setHoveredSeriesId(null)
+
+        if (isEnteringGroupsMode) {
+            setSelectedGroups([])
+        }
     }
 
     async function syncAllAccounts() {
@@ -653,16 +690,16 @@ function DashboardPage({
                                         <button
                                             type="button"
                                             className={chartMode === "categories" ? "active" : ""}
-                                            onClick={() => setChartMode("categories")}
+                                            onClick={() => selectChartMode("categories")}
                                         >
                                             Categories
                                         </button>
                                         <button
                                             type="button"
                                             className={chartMode === "groups" ? "active" : ""}
-                                            onClick={() => setChartMode("groups")}
+                                            onClick={() => selectChartMode("groups")}
                                         >
-                                            Groups
+                                            Reporting Groups
                                         </button>
                                     </div>
 
@@ -675,7 +712,7 @@ function DashboardPage({
                                     <svg
                                         viewBox="0 0 360 220"
                                         role="img"
-                                        aria-label="Monthly actual category chart"
+                                        aria-label="Monthly actual chart"
                                     >
                                         <g className="chart-grid">
                                             {[30, 70, 110, 150, 190].map((y) => (
@@ -714,122 +751,122 @@ function DashboardPage({
                                             y2="190"
                                         />
 
-                                        {hoveredCategoryTargetY !== null && (
+                                        {hoveredChartTargetY !== null && (
                                             <>
                                                 <line
                                                     className="chart-reference-line chart-reference-line-target"
                                                     x1="40"
-                                                    y1={hoveredCategoryTargetY}
+                                                    y1={hoveredChartTargetY}
                                                     x2="320"
-                                                    y2={hoveredCategoryTargetY}
+                                                    y2={hoveredChartTargetY}
                                                 />
                                                 <text
                                                     className="chart-reference-label chart-reference-label-target"
                                                     x="316"
                                                     y={targetLabelY}
                                                 >
-                                                    Target Threshold {formatCompactMoney(hoveredCategorySeries.target_threshold)}
+                                                    Target Threshold {formatCompactMoney(hoveredChartSeries.target_threshold)}
                                                 </text>
                                             </>
                                         )}
 
-                                        {hoveredCategoryAverageY !== null && (
+                                        {hoveredChartAverageY !== null && (
                                             <>
                                                 <line
                                                     className="chart-reference-line chart-reference-line-average"
                                                     x1="40"
-                                                    y1={hoveredCategoryAverageY}
+                                                    y1={hoveredChartAverageY}
                                                     x2="320"
-                                                    y2={hoveredCategoryAverageY}
+                                                    y2={hoveredChartAverageY}
                                                 />
                                                 <text
                                                     className="chart-reference-label chart-reference-label-average"
                                                     x="316"
                                                     y={averageLabelY}
                                                 >
-                                                    Average Line {formatCompactMoney(hoveredCategoryAverageTotal)}
+                                                    Average Line {formatCompactMoney(hoveredChartAverageTotal)}
                                                 </text>
                                             </>
                                         )}
 
-                                        {selectedCategorySeries.map((category, index) => (
+                                        {selectedChartSeries.map((item, index) => (
                                             <polyline
-                                                key={category.category_id}
+                                                key={item.id}
                                                 className="chart-line"
-                                                points={buildLinePoints(category.series, selectedCategoryActualMaxTotal)}
+                                                points={buildLinePoints(item.series, selectedChartActualMaxTotal)}
                                                 stroke={getCategoryColor(index)}
-                                                onMouseEnter={() => setHoveredCategoryId(category.category_id)}
-                                                onMouseLeave={() => setHoveredCategoryId(null)}
-                                                onFocus={() => setHoveredCategoryId(category.category_id)}
-                                                onBlur={() => setHoveredCategoryId(null)}
+                                                onMouseEnter={() => setHoveredSeriesId(item.id)}
+                                                onMouseLeave={() => setHoveredSeriesId(null)}
+                                                onFocus={() => setHoveredSeriesId(item.id)}
+                                                onBlur={() => setHoveredSeriesId(null)}
                                                 tabIndex={0}
                                             />
                                         ))}
                                     </svg>
 
-                                    {selectedCategorySeries.length === 0 && (
+                                    {selectedChartSeries.length === 0 && (
                                         <p>
-                                            Select categories or groups to draw chart lines.
+                                            Select categories or reporting groups to draw chart lines.
                                         </p>
                                     )}
                                 </div>
 
                                 <details className="chart-selector">
                                     <summary>
-                                        {chartMode === "categories" ? "Select Categories" : "Select Groups"}
+                                        {chartMode === "categories" ? "Select Categories" : "Select Reporting Groups"}
                                     </summary>
 
                                     <div className="chart-selector-menu">
-                                    {(chartMode === "categories"
-                                        ? chartData?.categories || []
-                                        : chartData?.groups || []
-                                    ).map((item) => {
-                                        const value = chartMode === "categories"
-                                            ? item.category_id
-                                            : item.reporting_group
-                                        const label = chartMode === "categories"
-                                            ? item.category_name
-                                            : getGroupLabel(item.reporting_group)
-                                        const selected = chartMode === "categories"
-                                            ? selectedCategoryIds.includes(value)
-                                            : selectedGroups.includes(value)
+                                        {(chartMode === "categories"
+                                            ? chartData?.categories || []
+                                            : reportingGroupOptions
+                                        ).map((item) => {
+                                            const value = chartMode === "categories"
+                                                ? item.category_id
+                                                : item.reporting_group
+                                            const label = chartMode === "categories"
+                                                ? item.category_name
+                                                : getGroupLabel(item.reporting_group)
+                                            const selected = chartMode === "categories"
+                                                ? selectedCategoryIds.includes(value)
+                                                : selectedGroups.includes(value)
 
-                                        return (
-                                            <label
-                                                key={value}
-                                                onMouseEnter={() => {
-                                                    if (chartMode === "categories" && selected) {
-                                                        setHoveredCategoryId(value)
-                                                    }
-                                                }}
-                                                onMouseLeave={() => {
-                                                    if (chartMode === "categories" && selected) {
-                                                        setHoveredCategoryId(null)
-                                                    }
-                                                }}
-                                            >
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selected}
-                                                    onChange={() => toggleChartSelection(value)}
-                                                />
-                                                {label}
-                                            </label>
-                                        )
-                                    })}
+                                            return (
+                                                <label
+                                                    key={value}
+                                                    onMouseEnter={() => {
+                                                        if (selected) {
+                                                            setHoveredSeriesId(value)
+                                                        }
+                                                    }}
+                                                    onMouseLeave={() => {
+                                                        if (selected) {
+                                                            setHoveredSeriesId(null)
+                                                        }
+                                                    }}
+                                                >
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selected}
+                                                        onChange={() => toggleChartSelection(value)}
+                                                    />
+                                                    {label}
+                                                </label>
+                                            )
+                                        })}
                                     </div>
                                 </details>
 
-                                {selectedCategorySeries.length > 0 && (
+                                {selectedChartSeries.length > 0 && (
                                     <div className="chart-legend">
-                                        {selectedCategorySeries.map((category, index) => (
+                                        {selectedChartSeries.map((item, index) => (
                                             <span
-                                                key={category.category_id}
-                                                onMouseEnter={() => setHoveredCategoryId(category.category_id)}
-                                                onMouseLeave={() => setHoveredCategoryId(null)}
+                                                key={item.id}
+                                                onMouseEnter={() => setHoveredSeriesId(item.id)}
+                                                onMouseLeave={() => setHoveredSeriesId(null)}
                                             >
                                                 <i style={{ backgroundColor: getCategoryColor(index) }} />
-                                                {category.category_name}
+                                                {item.label}
                                             </span>
                                         ))}
                                     </div>

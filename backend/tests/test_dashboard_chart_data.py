@@ -310,6 +310,85 @@ class DashboardChartDataTest(unittest.TestCase):
         self.assertIsNone(categories[dining.id]["target_threshold"])
         self.assertIsNone(categories[utilities.id]["target_threshold"])
 
+    def test_reporting_group_chart_data_aggregates_monthly_actuals(self):
+        account = self.create_account()
+        groceries = self.create_category(
+            "GROCERIES",
+            "Groceries",
+            models.ReportingGroup.EXPENSE,
+        )
+        utilities = self.create_category(
+            "UTILITIES",
+            "Utilities",
+            models.ReportingGroup.EXPENSE,
+        )
+        paychecks = self.create_category(
+            "PAYCHECKS",
+            "Paychecks",
+            models.ReportingGroup.INCOME,
+        )
+        internal_transfer = self.create_category(
+            "INTERNAL_TRANSFER",
+            "Internal Transfer",
+            models.ReportingGroup.SYSTEM,
+        )
+
+        self.create_transaction(
+            "JAN_GROCERY",
+            account.id,
+            groceries.id,
+            -30,
+            datetime.date(2026, 1, 5),
+        )
+        self.create_transaction(
+            "JAN_UTILITIES",
+            account.id,
+            utilities.id,
+            -40,
+            datetime.date(2026, 1, 10),
+        )
+        self.create_transaction(
+            "FEB_PAYCHECK",
+            account.id,
+            paychecks.id,
+            1500,
+            datetime.date(2026, 2, 1),
+        )
+        self.create_transaction(
+            "SYSTEM_TXN",
+            account.id,
+            internal_transfer.id,
+            -999,
+            datetime.date(2026, 2, 2),
+        )
+
+        result = services.get_dashboard_chart_data(
+            self.db,
+            start_date=datetime.date(2026, 1, 1),
+            end_date=datetime.date(2026, 2, 28),
+        )
+
+        groups = {
+            group["reporting_group"]: group
+            for group in result["groups"]
+        }
+
+        self.assertNotIn("system", groups)
+        self.assertEqual(
+            groups["expense"]["series"],
+            [
+                {"month": "2026-01", "total": 70.0},
+                {"month": "2026-02", "total": 0.0},
+            ],
+        )
+        self.assertEqual(
+            groups["income"]["series"],
+            [
+                {"month": "2026-01", "total": 0.0},
+                {"month": "2026-02", "total": 1500.0},
+            ],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
