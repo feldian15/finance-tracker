@@ -37,26 +37,29 @@ function getPresetRange(preset) {
     }
 
     if (preset === "last_3_months") {
-        const start = addMonths(currentMonth, -2)
+        const start = addMonths(currentMonth, -3)
+        const end = lastDayOfMonth(addMonths(currentMonth, -1))
         return {
             startDate: toDateInputValue(start),
-            endDate: toDateInputValue(lastDayOfMonth(currentMonth))
+            endDate: toDateInputValue(end)
         }
     }
 
     if (preset === "last_6_months") {
-        const start = addMonths(currentMonth, -5)
+        const start = addMonths(currentMonth, -6)
+        const end = lastDayOfMonth(addMonths(currentMonth, -1))
         return {
             startDate: toDateInputValue(start),
-            endDate: toDateInputValue(lastDayOfMonth(currentMonth))
+            endDate: toDateInputValue(end)
         }
     }
 
     if (preset === "year_to_date") {
         const start = new Date(today.getFullYear(), 0, 1)
+        const end = lastDayOfMonth(addMonths(currentMonth, -1))
         return {
             startDate: toDateInputValue(start),
-            endDate: toDateInputValue(lastDayOfMonth(currentMonth))
+            endDate: toDateInputValue(end)
         }
     }
 
@@ -257,6 +260,10 @@ function getChartReferenceY(total, maxTotal) {
     return clampChartY(getChartY(total, maxTotal))
 }
 
+function getReferenceTagY(y) {
+    return clampChartY(y - 6)
+}
+
 function getNiceChartStep(maxTotal) {
     const rawStep = maxTotal / 4
     const magnitude = 10 ** Math.floor(Math.log10(rawStep || 1))
@@ -334,6 +341,8 @@ function DashboardPage({
     const [chartData, setChartData] = useState(null)
     const [hoveredSeriesId, setHoveredSeriesId] = useState(null)
     const [hoveredPoint, setHoveredPoint] = useState(null)
+    const [pinnedSeriesId, setPinnedSeriesId] = useState(null)
+    const [pinnedPoint, setPinnedPoint] = useState(null)
 
     const totalBalance = accounts.reduce((sum, account) => {
         return sum + Number(balances?.[account.id] ?? 0)
@@ -403,31 +412,39 @@ function DashboardPage({
     }, [selectedChartSeries])
     const selectedChartMaxTotal = getNiceChartMax(selectedChartActualMaxTotal)
 
-    const hoveredChartSeries = selectedChartSeries.find((item) => (
-        item.id === hoveredSeriesId
+    const activeSeriesId = hoveredSeriesId || pinnedSeriesId
+    const activePoint = hoveredPoint || pinnedPoint
+    const activeChartSeries = selectedChartSeries.find((item) => (
+        item.id === activeSeriesId
     ))
-    const hoveredChartAverageTotal = hoveredChartSeries
-        ? getAverageTotal(hoveredChartSeries.series)
+    const activeChartSeriesIndex = selectedChartSeries.findIndex((item) => (
+        item.id === activeSeriesId
+    ))
+    const activeChartColor = activeChartSeriesIndex >= 0
+        ? getCategoryColor(activeChartSeriesIndex)
+        : "var(--text-muted)"
+    const activeChartAverageTotal = activeChartSeries
+        ? getAverageTotal(activeChartSeries.series)
         : null
-    const hoveredChartTargetY = hasTargetThreshold(hoveredChartSeries)
-        ? getChartReferenceY(hoveredChartSeries.target_threshold, selectedChartMaxTotal)
+    const activeChartTargetY = hasTargetThreshold(activeChartSeries)
+        ? getChartReferenceY(activeChartSeries.target_threshold, selectedChartMaxTotal)
         : null
-    const hoveredChartAverageY = hoveredChartAverageTotal !== null
-        ? getChartReferenceY(hoveredChartAverageTotal, selectedChartMaxTotal)
+    const activeChartAverageY = activeChartAverageTotal !== null
+        ? getChartReferenceY(activeChartAverageTotal, selectedChartMaxTotal)
         : null
     const chartScaleTicks = selectedChartSeries.length > 0
         ? getChartScaleTicks(selectedChartMaxTotal)
         : []
     const hoveredPointMonth = chartData?.months?.find((month) => (
-        month.month === hoveredPoint?.month
+        month.month === activePoint?.month
     ))
-    const chartHoverDetails = hoveredChartSeries
+    const chartHoverDetails = activeChartSeries
         ? {
-            label: hoveredChartSeries.label,
-            targetThreshold: hoveredChartSeries.target_threshold,
-            averageTotal: hoveredChartAverageTotal,
-            pointLabel: hoveredPointMonth?.label || hoveredPoint?.month,
-            pointTotal: hoveredPoint?.total
+            label: activeChartSeries.label,
+            targetThreshold: activeChartSeries.target_threshold,
+            averageTotal: activeChartAverageTotal,
+            pointLabel: hoveredPointMonth?.label || activePoint?.month,
+            pointTotal: activePoint?.total
         }
         : null
 
@@ -487,6 +504,8 @@ function DashboardPage({
         if (!nextIsOpen) {
             setHoveredSeriesId(null)
             setHoveredPoint(null)
+            setPinnedSeriesId(null)
+            setPinnedPoint(null)
             return
         }
 
@@ -495,6 +514,8 @@ function DashboardPage({
         setSelectedGroups([])
         setHoveredSeriesId(null)
         setHoveredPoint(null)
+        setPinnedSeriesId(null)
+        setPinnedPoint(null)
 
         try {
             const data = await fetchDashboardChartData(startDate, endDate)
@@ -527,10 +548,24 @@ function DashboardPage({
         setChartMode(mode)
         setHoveredSeriesId(null)
         setHoveredPoint(null)
+        setPinnedSeriesId(null)
+        setPinnedPoint(null)
 
         if (isEnteringGroupsMode) {
             setSelectedGroups([])
         }
+    }
+
+    function pinChartSeries(seriesId, point = null) {
+        setPinnedSeriesId(seriesId)
+        setPinnedPoint(point)
+        setHoveredSeriesId(null)
+        setHoveredPoint(null)
+    }
+
+    function clearPinnedChartSeries() {
+        setPinnedSeriesId(null)
+        setPinnedPoint(null)
     }
 
     async function syncAllAccounts() {
@@ -652,8 +687,8 @@ function DashboardPage({
                     {[
                         ["current_month", "Current Month"],
                         ["previous_month", "Previous Month"],
-                        ["last_3_months", "Last 3 Months"],
-                        ["last_6_months", "Last 6 Months"],
+                        ["last_3_months", "Previous 3 Months"],
+                        ["last_6_months", "Previous 6 Months"],
                         ["year_to_date", "Year to Date"],
                         ["manual", "Manual"]
                     ].map(([value, label]) => (
@@ -748,184 +783,6 @@ function DashboardPage({
                                     </span>
                                 </div>
 
-                                <div className="chart-frame">
-                                    <svg
-                                        viewBox="0 0 360 220"
-                                        role="img"
-                                        aria-label="Monthly actual chart"
-                                    >
-                                        <g className="chart-grid">
-                                            {chartScaleTicks.map((tick) => (
-                                                <line
-                                                    key={tick.value}
-                                                    x1={chartBounds.left}
-                                                    y1={tick.y}
-                                                    x2={chartBounds.right}
-                                                    y2={tick.y}
-                                                />
-                                            ))}
-                                        </g>
-                                        <g className="chart-scale">
-                                            {chartScaleTicks.map((tick) => (
-                                                <text
-                                                    key={tick.value}
-                                                    x="34"
-                                                    y={tick.y}
-                                                >
-                                                    {formatCompactMoney(tick.value)}
-                                                </text>
-                                            ))}
-                                        </g>
-                                        <line
-                                            className="chart-axis"
-                                            x1={chartBounds.left}
-                                            y1={chartBounds.top}
-                                            x2={chartBounds.left}
-                                            y2={chartBounds.bottom}
-                                        />
-                                        <line
-                                            className="chart-axis"
-                                            x1={chartBounds.left}
-                                            y1={chartBounds.bottom}
-                                            x2={chartBounds.right}
-                                            y2={chartBounds.bottom}
-                                        />
-                                        <g className="chart-month-labels">
-                                            {(chartData?.months || []).map((month, index) => (
-                                                <text
-                                                    key={month.month}
-                                                    x={getChartX(index, chartData?.months?.length || 0)}
-                                                    y="203"
-                                                >
-                                                    {month.label.split(" ")[0]}
-                                                </text>
-                                            ))}
-                                        </g>
-
-                                        {hoveredChartTargetY !== null && (
-                                            <line
-                                                className="chart-reference-line chart-reference-line-target"
-                                                x1={chartBounds.left}
-                                                y1={hoveredChartTargetY}
-                                                x2={chartBounds.right}
-                                                y2={hoveredChartTargetY}
-                                            />
-                                        )}
-
-                                        {hoveredChartAverageY !== null && (
-                                            <line
-                                                className="chart-reference-line chart-reference-line-average"
-                                                x1={chartBounds.left}
-                                                y1={hoveredChartAverageY}
-                                                x2={chartBounds.right}
-                                                y2={hoveredChartAverageY}
-                                            />
-                                        )}
-
-                                        {selectedChartSeries.map((item, index) => (
-                                            <g key={item.id}>
-                                                <polyline
-                                                    className="chart-line-hit"
-                                                    points={buildLinePoints(item.series, selectedChartMaxTotal)}
-                                                    onMouseEnter={() => {
-                                                        setHoveredSeriesId(item.id)
-                                                        setHoveredPoint(null)
-                                                    }}
-                                                    onMouseLeave={() => {
-                                                        setHoveredSeriesId(null)
-                                                        setHoveredPoint(null)
-                                                    }}
-                                                />
-                                                <polyline
-                                                    className="chart-line"
-                                                    points={buildLinePoints(item.series, selectedChartMaxTotal)}
-                                                    stroke={getCategoryColor(index)}
-                                                    onMouseEnter={() => {
-                                                        setHoveredSeriesId(item.id)
-                                                        setHoveredPoint(null)
-                                                    }}
-                                                    onMouseLeave={() => {
-                                                        setHoveredSeriesId(null)
-                                                        setHoveredPoint(null)
-                                                    }}
-                                                    onFocus={() => {
-                                                        setHoveredSeriesId(item.id)
-                                                        setHoveredPoint(null)
-                                                    }}
-                                                    onBlur={() => {
-                                                        setHoveredSeriesId(null)
-                                                        setHoveredPoint(null)
-                                                    }}
-                                                    tabIndex={0}
-                                                />
-                                                {item.series.map((point, pointIndex) => {
-                                                    const x = getChartX(pointIndex, item.series.length)
-                                                    const y = getChartY(point.total, selectedChartMaxTotal)
-
-                                                    return (
-                                                        <circle
-                                                            key={`${item.id}-${point.month}`}
-                                                            className="chart-point"
-                                                            cx={x}
-                                                            cy={y}
-                                                            r="5"
-                                                            fill={getCategoryColor(index)}
-                                                            onMouseEnter={() => {
-                                                                setHoveredSeriesId(item.id)
-                                                                setHoveredPoint(point)
-                                                            }}
-                                                            onMouseLeave={() => {
-                                                                setHoveredSeriesId(null)
-                                                                setHoveredPoint(null)
-                                                            }}
-                                                            onFocus={() => {
-                                                                setHoveredSeriesId(item.id)
-                                                                setHoveredPoint(point)
-                                                            }}
-                                                            onBlur={() => {
-                                                                setHoveredSeriesId(null)
-                                                                setHoveredPoint(null)
-                                                            }}
-                                                            tabIndex={0}
-                                                        />
-                                                    )
-                                                })}
-                                            </g>
-                                        ))}
-                                    </svg>
-
-                                    {selectedChartSeries.length === 0 && (
-                                        <p>
-                                            Select categories or reporting groups to draw chart lines.
-                                        </p>
-                                    )}
-
-                                    {chartHoverDetails && (
-                                        <div className="chart-hover-card">
-                                            <strong>{chartHoverDetails.label}</strong>
-                                            {chartHoverDetails.pointLabel && (
-                                                <span>
-                                                    {chartHoverDetails.pointLabel}
-                                                    <b>{formatMoney(chartHoverDetails.pointTotal)}</b>
-                                                </span>
-                                            )}
-                                            {chartHoverDetails.targetThreshold !== null
-                                                && chartHoverDetails.targetThreshold !== undefined
-                                                && (
-                                                    <span>
-                                                        Target Threshold
-                                                        <b>{formatMoney(chartHoverDetails.targetThreshold)}</b>
-                                                    </span>
-                                                )
-                                            }
-                                            <span>
-                                                Average Line
-                                                <b>{formatMoney(chartHoverDetails.averageTotal)}</b>
-                                            </span>
-                                        </div>
-                                    )}
-                                </div>
-
                                 <details className="chart-selector">
                                     <summary>
                                         {chartMode === "categories" ? "Select Categories" : "Select Reporting Groups"}
@@ -994,6 +851,217 @@ function DashboardPage({
                                         ))}
                                     </div>
                                 )}
+
+                                <div className="chart-frame">
+                                    <svg
+                                        viewBox="0 0 360 220"
+                                        role="img"
+                                        aria-label="Monthly actual chart"
+                                        onClick={clearPinnedChartSeries}
+                                    >
+                                        <g className="chart-grid">
+                                            {chartScaleTicks.map((tick) => (
+                                                <line
+                                                    key={tick.value}
+                                                    x1={chartBounds.left}
+                                                    y1={tick.y}
+                                                    x2={chartBounds.right}
+                                                    y2={tick.y}
+                                                />
+                                            ))}
+                                        </g>
+                                        <g className="chart-scale">
+                                            {chartScaleTicks.map((tick) => (
+                                                <text
+                                                    key={tick.value}
+                                                    x="34"
+                                                    y={tick.y}
+                                                >
+                                                    {formatCompactMoney(tick.value)}
+                                                </text>
+                                            ))}
+                                        </g>
+                                        <line
+                                            className="chart-axis"
+                                            x1={chartBounds.left}
+                                            y1={chartBounds.top}
+                                            x2={chartBounds.left}
+                                            y2={chartBounds.bottom}
+                                        />
+                                        <line
+                                            className="chart-axis"
+                                            x1={chartBounds.left}
+                                            y1={chartBounds.bottom}
+                                            x2={chartBounds.right}
+                                            y2={chartBounds.bottom}
+                                        />
+                                        <g className="chart-month-labels">
+                                            {(chartData?.months || []).map((month, index) => (
+                                                <text
+                                                    key={month.month}
+                                                    x={getChartX(index, chartData?.months?.length || 0)}
+                                                    y="188"
+                                                >
+                                                    {month.label.split(" ")[0]}
+                                                </text>
+                                            ))}
+                                        </g>
+
+                                        {activeChartTargetY !== null && (
+                                            <>
+                                                <line
+                                                    className="chart-reference-line chart-reference-line-target"
+                                                    x1={chartBounds.left}
+                                                    y1={activeChartTargetY}
+                                                    x2={chartBounds.right}
+                                                    y2={activeChartTargetY}
+                                                />
+                                                <text
+                                                    className="chart-reference-tag"
+                                                    x={chartBounds.right - 4}
+                                                    y={getReferenceTagY(activeChartTargetY)}
+                                                >
+                                                    Target
+                                                </text>
+                                            </>
+                                        )}
+
+                                        {activeChartAverageY !== null && (
+                                            <>
+                                                <line
+                                                    className="chart-reference-line chart-reference-line-average"
+                                                    x1={chartBounds.left}
+                                                    y1={activeChartAverageY}
+                                                    x2={chartBounds.right}
+                                                    y2={activeChartAverageY}
+                                                    stroke={activeChartColor}
+                                                />
+                                                <text
+                                                    className="chart-reference-tag chart-reference-tag-average"
+                                                    x={chartBounds.right - 4}
+                                                    y={getReferenceTagY(activeChartAverageY)}
+                                                    fill={activeChartColor}
+                                                >
+                                                    Average
+                                                </text>
+                                            </>
+                                        )}
+
+                                        {selectedChartSeries.map((item, index) => (
+                                            <g key={item.id}>
+                                                <polyline
+                                                    className="chart-line-hit"
+                                                    points={buildLinePoints(item.series, selectedChartMaxTotal)}
+                                                    onMouseEnter={() => {
+                                                        setHoveredSeriesId(item.id)
+                                                        setHoveredPoint(null)
+                                                    }}
+                                                    onMouseLeave={() => {
+                                                        setHoveredSeriesId(null)
+                                                        setHoveredPoint(null)
+                                                    }}
+                                                    onClick={(event) => {
+                                                        event.stopPropagation()
+                                                        pinChartSeries(item.id)
+                                                    }}
+                                                />
+                                                <polyline
+                                                    className="chart-line"
+                                                    points={buildLinePoints(item.series, selectedChartMaxTotal)}
+                                                    stroke={getCategoryColor(index)}
+                                                    onMouseEnter={() => {
+                                                        setHoveredSeriesId(item.id)
+                                                        setHoveredPoint(null)
+                                                    }}
+                                                    onMouseLeave={() => {
+                                                        setHoveredSeriesId(null)
+                                                        setHoveredPoint(null)
+                                                    }}
+                                                    onFocus={() => {
+                                                        setHoveredSeriesId(item.id)
+                                                        setHoveredPoint(null)
+                                                    }}
+                                                    onBlur={() => {
+                                                        setHoveredSeriesId(null)
+                                                        setHoveredPoint(null)
+                                                    }}
+                                                    onClick={(event) => {
+                                                        event.stopPropagation()
+                                                        pinChartSeries(item.id)
+                                                    }}
+                                                    tabIndex={0}
+                                                />
+                                                {item.series.map((point, pointIndex) => {
+                                                    const x = getChartX(pointIndex, item.series.length)
+                                                    const y = getChartY(point.total, selectedChartMaxTotal)
+
+                                                    return (
+                                                        <circle
+                                                            key={`${item.id}-${point.month}`}
+                                                            className="chart-point"
+                                                            cx={x}
+                                                            cy={y}
+                                                            r="5"
+                                                            fill={getCategoryColor(index)}
+                                                            onMouseEnter={() => {
+                                                                setHoveredSeriesId(item.id)
+                                                                setHoveredPoint(point)
+                                                            }}
+                                                            onMouseLeave={() => {
+                                                                setHoveredSeriesId(null)
+                                                                setHoveredPoint(null)
+                                                            }}
+                                                            onFocus={() => {
+                                                                setHoveredSeriesId(item.id)
+                                                                setHoveredPoint(point)
+                                                            }}
+                                                            onBlur={() => {
+                                                                setHoveredSeriesId(null)
+                                                                setHoveredPoint(null)
+                                                            }}
+                                                            onClick={(event) => {
+                                                                event.stopPropagation()
+                                                                pinChartSeries(item.id, point)
+                                                            }}
+                                                            tabIndex={0}
+                                                        />
+                                                    )
+                                                })}
+                                            </g>
+                                        ))}
+                                    </svg>
+
+                                    {selectedChartSeries.length === 0 && (
+                                        <p>
+                                            Select categories or reporting groups to draw chart lines.
+                                        </p>
+                                    )}
+
+                                    {chartHoverDetails && (
+                                        <div className="chart-hover-card">
+                                            <strong>{chartHoverDetails.label}</strong>
+                                            {chartHoverDetails.pointLabel && (
+                                                <span>
+                                                    {chartHoverDetails.pointLabel}
+                                                    <b>{formatMoney(chartHoverDetails.pointTotal)}</b>
+                                                </span>
+                                            )}
+                                            {chartHoverDetails.targetThreshold !== null
+                                                && chartHoverDetails.targetThreshold !== undefined
+                                                && (
+                                                    <span>
+                                                        Target Threshold
+                                                        <b>{formatMoney(chartHoverDetails.targetThreshold)}</b>
+                                                    </span>
+                                                )
+                                            }
+                                            <span>
+                                                Average Line
+                                                <b>{formatMoney(chartHoverDetails.averageTotal)}</b>
+                                            </span>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         )}
                     </section>
