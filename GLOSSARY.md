@@ -51,4 +51,12 @@ _Avoid_: Mean guide, baseline
 ## Favorability
 
 Whether a category's actual amount is better or worse than its expected amount for the selected dashboard reporting period. Lower spending is favorable for expenses, while higher contributions are favorable for savings and investments.
+
+## Duplicate Candidate
+
+An imported transaction that matches an existing transaction according to heuristic duplicate-detection rules, such as matching account, date, amount, and description, and is imported with a review flag instead of being silently discarded. A repeated Plaid transaction ID is treated as an exact source duplicate and remains suppressed. Duplicate candidates may come from Plaid or CSV imports.
+
+## Needs Review
+
+A transaction marker indicating that the transaction requires explicit user confirmation before its duplicate alert is resolved. A transaction marked **Needs Review** still participates in balances and reports; marking it correct clears the marker, while editing alone does not.
 _Avoid_: Good/bad color, positive/negative variance
