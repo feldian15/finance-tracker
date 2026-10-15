@@ -596,7 +596,7 @@ function DashboardPage({
                 sum + Number(result.transactions_created || 0)
             ), 0)
             const duplicates = results.reduce((sum, result) => (
-                sum + Number(result.duplicate_transactions_skipped || 0)
+                sum + Number(result.duplicate_transactions_flagged || 0)
             ), 0)
 
             await Promise.all([
@@ -606,7 +606,7 @@ function DashboardPage({
                 refreshUncategorizedCount()
             ])
 
-            const message = `Sync complete: ${created} added, ${duplicates} duplicates`
+            const message = `Sync complete: ${created} added, ${duplicates} duplicates needing review`
             setSyncStatus(message)
             toast.success(message)
         } catch (error) {

@@ -93,6 +93,7 @@ function App() {
     const [categoryId, setCategoryId] = useState("")
     const [accountId, setAccountId] = useState("")
     const [descriptionSearch, setDescriptionSearch] = useState("")
+    const [needsReview, setNeedsReview] = useState(null)
     const [appliedTransactionFilters, setAppliedTransactionFilters] = useState(null)
 
     const loadTransactions = useCallback(async (
@@ -109,7 +110,8 @@ function App() {
                 transactionType,
                 categoryId,
                 accountId,
-                descriptionSearch
+                descriptionSearch,
+                needsReview
             }
 
             const filters = {
@@ -133,7 +135,8 @@ function App() {
         transactionType,
         categoryId,
         accountId,
-        descriptionSearch
+        descriptionSearch,
+        needsReview
     ])
 
     async function refreshTransactions() {
@@ -158,6 +161,7 @@ function App() {
         setCategoryId("")
         setAccountId("")
         setDescriptionSearch("")
+        setNeedsReview(null)
 
         if (window.location.pathname === "/transactions") {
             const url = new URL(window.location.href)
@@ -358,6 +362,8 @@ function App() {
 
                                 descriptionSearch={descriptionSearch}
                                 setDescriptionSearch={setDescriptionSearch}
+                                needsReview={needsReview}
+                                setNeedsReview={setNeedsReview}
                                 clearFilters={clearFilters}
                             />
                         }

@@ -37,7 +37,7 @@ function CsvImportSection({ accounts, loadTransactions }) {
 
             setSummary({
                 transactions_created: 0,
-                duplicate_transactions_skipped: 0,
+                duplicate_transactions_flagged: 0,
                 invalid_transactions: 1
             })
         }
@@ -91,7 +91,7 @@ function CsvImportSection({ accounts, loadTransactions }) {
             {summary && (
                 <div>
                     <p>Imported: {summary.transactions_created}</p>
-                    <p>Duplicates: {summary.duplicate_transactions_skipped}</p>
+                    <p>Duplicates needing review: {summary.duplicate_transactions_flagged}</p>
                     <p>Errors: {summary.invalid_transactions}</p>
                 </div>
             )}

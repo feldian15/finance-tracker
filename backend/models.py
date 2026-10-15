@@ -1,6 +1,6 @@
 from datetime import date, datetime
 from pydantic import Field
-from sqlalchemy import Column, Enum, String, Float, ForeignKey, Integer, DateTime, Date, UniqueConstraint
+from sqlalchemy import Column, Enum, String, Float, ForeignKey, Integer, DateTime, Date, Boolean, UniqueConstraint
 from sqlalchemy.orm import relationship
 from db import Base
 
@@ -58,6 +58,7 @@ class Transaction(Base):
     transaction_type = Column(Enum(TransactionType), nullable=False, default=TransactionType.EXPENSE)
 
     plaid_transaction_id = Column(String, unique=True, nullable=True)
+    needs_review = Column(Boolean, nullable=False, default=False, server_default="0")
 
     category = relationship("Category", backref="transactions")
     account = relationship("Account", backref="transactions")

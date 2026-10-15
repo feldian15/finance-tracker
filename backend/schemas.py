@@ -25,6 +25,7 @@ class TransactionOut(BaseModel):
     category_id: Optional[str] = None
     category_name: Optional[str] = None
     transaction_type: TransactionType
+    needs_review: bool = False
 
     class Config:
         from_attributes = True
@@ -36,6 +37,7 @@ class TransactionUpdate(BaseModel):
     date: datetime.date | None = None
     category_id: str | None = None
     transaction_type: TransactionType | None = None
+    needs_review: bool | None = None
 
 
 class AccountCreate(BaseModel):

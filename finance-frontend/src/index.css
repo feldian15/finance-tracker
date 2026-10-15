@@ -199,6 +199,212 @@ h2 {
     box-shadow: var(--shadow);
 }
 
+.transactions-page {
+    width: min(1380px, 100%);
+    margin: 0 auto;
+    padding: 24px;
+}
+
+.transactions-section {
+    display: grid;
+    gap: 18px;
+}
+
+.transactions-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+}
+
+.transactions-filters,
+.transaction-form-card {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    box-shadow: var(--shadow);
+}
+
+.transactions-filters input,
+.transactions-filters select {
+    flex: 1 1 150px;
+    min-width: 140px;
+}
+
+.transactions-filters button {
+    align-self: center;
+}
+
+.needs-review-filter {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    min-height: 36px;
+    padding: 7px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 650;
+    white-space: nowrap;
+}
+
+.needs-review-filter input {
+    flex: 0 0 auto;
+    min-width: 16px;
+    min-height: 16px;
+    accent-color: var(--accent);
+}
+
+.transactions-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-muted);
+    font-size: 13px;
+}
+
+.transactions-toolbar label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.transactions-table-wrap {
+    max-height: calc(100svh - 310px);
+    min-height: 220px;
+    overflow-y: auto;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    box-shadow: var(--shadow);
+}
+
+.transactions-table {
+    width: 100%;
+    min-width: 0;
+    table-layout: fixed;
+}
+
+.transactions-table th,
+.transactions-table td {
+    padding: 8px 7px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+.transactions-table th:nth-child(1),
+.transactions-table td:nth-child(1) {
+    width: 15%;
+}
+
+.transactions-table th:nth-child(2),
+.transactions-table td:nth-child(2) {
+    width: 11%;
+}
+
+.transactions-table th:nth-child(3),
+.transactions-table td:nth-child(3) {
+    width: 22%;
+}
+
+.transactions-table th:nth-child(4),
+.transactions-table td:nth-child(4) {
+    width: 10%;
+}
+
+.transactions-table th:nth-child(5),
+.transactions-table td:nth-child(5) {
+    width: 15%;
+}
+
+.transactions-table th:nth-child(6),
+.transactions-table td:nth-child(6) {
+    width: 12%;
+}
+
+.transactions-table td {
+    vertical-align: middle;
+}
+
+/* Keep long transaction descriptions and edit controls inside their cells. */
+.finance-table.transactions-table th,
+.finance-table.transactions-table td {
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.finance-table.transactions-table td input,
+.finance-table.transactions-table td select {
+    box-sizing: border-box;
+    max-width: 100%;
+}
+
+.transactions-table td button + button {
+    margin-left: 6px;
+}
+
+.transaction-actions {
+    width: 15%;
+}
+
+.transaction-actions button {
+    margin: 2px 3px 2px 0;
+}
+
+.needs-review-row td {
+    background: var(--alert-bg);
+    border-bottom-color: var(--alert-border);
+}
+
+.needs-review-row td:first-child {
+    box-shadow: inset 4px 0 0 var(--alert-border);
+}
+
+.needs-review-badge {
+    display: inline-flex;
+    align-items: center;
+    margin-right: 8px;
+    padding: 3px 7px;
+    border: 1px solid var(--alert-border);
+    border-radius: 999px;
+    background: var(--alert-bg);
+    color: var(--alert-text);
+    font-size: 11px;
+    font-weight: 750;
+    white-space: nowrap;
+}
+
+.transaction-form-card {
+    align-items: center;
+}
+
+.transaction-form-card .section-heading {
+    flex: 0 0 100%;
+    padding: 0 0 4px;
+}
+
+.transaction-form-card input,
+.transaction-form-card select {
+    flex: 1 1 150px;
+}
+
+@media (max-width: 760px) {
+    .transactions-page {
+        padding: 16px;
+    }
+
+    .transactions-toolbar {
+        justify-content: flex-start;
+    }
+}
+
 .period-panel {
     display: flex;
     align-items: center;

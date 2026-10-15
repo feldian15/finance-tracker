@@ -40,6 +40,9 @@ function TransactionsSection({
     descriptionSearch,
     setDescriptionSearch,
 
+    needsReview,
+    setNeedsReview,
+
     clearFilters,
     drilldownCategoryId = ""
 }) {
@@ -97,6 +100,15 @@ function TransactionsSection({
         }
     }
 
+    async function markCorrect(txnId) {
+        try {
+            await updateTransaction(txnId, { needs_review: false })
+            await refreshTransactions()
+        } catch (error) {
+            console.error(error)
+        }
+    }
+
     function startEdit(txn) {
 
         setEditingTxnId(txn.id)
@@ -113,10 +125,17 @@ function TransactionsSection({
 
 
     return (
-        <div>
-            <h1>Transactions</h1>
+        <div className="transactions-section">
+            <div className="transactions-header">
+                <div>
+                    <h1>Transactions</h1>
+                    <p className="dashboard-subtitle">
+                        Review, organize, and manage every imported transaction.
+                    </p>
+                </div>
+            </div>
 
-            <div>
+            <div className="transactions-filters">
               <input
                   type="number"
                   placeholder="Min Amount"
@@ -218,9 +237,17 @@ function TransactionsSection({
                 }
             />
 
-            </div>
+            <label className="needs-review-filter">
+                <input
+                    type="checkbox"
+                    checked={needsReview === true}
+                    onChange={(e) => setNeedsReview(e.target.checked ? true : null)}
+                />
+                Needs review
+            </label>
 
             <button
+                className="primary-button"
                 onClick={async () => {
                     await loadTransactions()
                     setHasSearched(true)
@@ -230,6 +257,7 @@ function TransactionsSection({
             </button>
 
             <button
+                className="secondary-button"
                 onClick={async () => {
                     const shouldKeepResultsVisible = visibleResults
 
@@ -242,12 +270,12 @@ function TransactionsSection({
                     setHasSearched(shouldKeepResultsVisible)
                     navigate("/transactions", { replace: true })
                 }}
-                style={{ marginLeft: "8px" }}
             >
                 Clear Filters
             </button>
+            </div>
 
-            <div style={{ marginTop: "12px", marginBottom: "12px" }}>
+            <div className="transactions-toolbar">
                 <label>
                     Sort by:
                     <select
@@ -266,7 +294,8 @@ function TransactionsSection({
             </div>
 
             {visibleResults && (
-                <table>
+                <div className="table-wrap transactions-table-wrap">
+                <table className="finance-table transactions-table">
                     <thead>
                         <tr>
                             <th>Account Name</th>
@@ -275,13 +304,17 @@ function TransactionsSection({
                             <th>Amount</th>
                             <th>Category</th>
                             <th>Transaction Type</th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
 
                     <tbody>
                         {sortedTransactions.map((txn) => (
 
-                            <tr key={txn.id}>
+                            <tr
+                                key={txn.id}
+                                className={txn.needs_review ? "needs-review-row" : ""}
+                            >
 
                                 <td>
                                     {txn.account_name} ({txn.account_type})
@@ -316,7 +349,14 @@ function TransactionsSection({
                                             }
                                         />
                                     ) : (
-                                        txn.description
+                                        <>
+                                            {txn.needs_review && (
+                                                <span className="needs-review-badge">
+                                                    Needs review
+                                                </span>
+                                            )}
+                                            {txn.description}
+                                        </>
                                     )}
                                 </td>
 
@@ -386,7 +426,7 @@ function TransactionsSection({
                                     )}
                                 </td>
 
-                                <td>
+                                <td className="transaction-actions">
                                     {editingTxnId === txn.id ? (
                                         <>
                                             <button onClick={() => saveEdit(txn.id)}>
@@ -398,20 +438,25 @@ function TransactionsSection({
                                             </button>
                                         </>
                                     ) : (
-                                        <button onClick={() => startEdit(txn)}>
-                                            Edit
-                                        </button>
+                                        <>
+                                            {txn.needs_review && (
+                                                <button onClick={() => markCorrect(txn.id)}>
+                                                    Mark correct
+                                                </button>
+                                            )}
+                                            <button onClick={() => startEdit(txn)}>
+                                                Edit
+                                            </button>
+                                            <button
+                                                onClick={async () => {
+                                                    await deleteTransaction(txn.id)
+                                                    await refreshTransactions()
+                                                }}
+                                            >
+                                                Delete
+                                            </button>
+                                        </>
                                     )}
-                                </td>
-                                <td>
-                                    <button
-                                        onClick={async () => {
-                                            await deleteTransaction(txn.id)
-                                            await refreshTransactions()
-                                        }}
-                                    >
-                                        Delete
-                                    </button>
                                 </td>
 
                             </tr>
@@ -419,9 +464,13 @@ function TransactionsSection({
                         ))}
                     </tbody>
                 </table>
+                </div>
             )}
 
-            <h2>Add Transaction</h2>
+            <section className="transaction-form-card">
+            <div className="section-heading">
+                <h2>Add Transaction</h2>
+            </div>
 
             <select
                 value={newTxn.account_id}
@@ -504,6 +553,7 @@ function TransactionsSection({
             </select>
 
             <button
+                className="primary-button"
                 disabled={!newTxn.account_id}
                 onClick={async () => {
                     await createTransaction(newTxn)
@@ -514,6 +564,7 @@ function TransactionsSection({
             >
                 Add Transaction
             </button>
+            </section>
 
         </div>
     )

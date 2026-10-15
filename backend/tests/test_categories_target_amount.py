@@ -170,6 +170,28 @@ class CategoryTargetAmountTest(unittest.TestCase):
             [column["name"] for column in columns],
         )
 
+    def test_lightweight_schema_update_adds_needs_review_column(self):
+        import services
+
+        engine = create_engine("sqlite:///legacy-transactions.db")
+
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    "CREATE TABLE transactions ("
+                    "id VARCHAR PRIMARY KEY"
+                    ")"
+                )
+            )
+
+        services.ensure_transaction_needs_review_column(engine)
+
+        columns = inspect(engine).get_columns("transactions")
+        self.assertIn(
+            "needs_review",
+            [column["name"] for column in columns],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

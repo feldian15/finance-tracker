@@ -126,6 +126,10 @@ export async function fetchTransactions(filters = {}) {
         params.append("description", filters.descriptionSearch)
     }
 
+    if (filters.needsReview !== null && filters.needsReview !== undefined) {
+        params.append("needs_review", filters.needsReview)
+    }
+
     const response = await fetch(
         `${API_BASE}/transactions?${params.toString()}`
     )

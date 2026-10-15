@@ -12,6 +12,7 @@ function TransactionsPage({
     setTransactionType,
     setAccountId,
     setDescriptionSearch,
+    setNeedsReview,
     loadTransactions,
     ...props
 }) {
@@ -37,6 +38,7 @@ function TransactionsPage({
         setCategoryId(categoryFromQuery)
         setAccountId("")
         setDescriptionSearch("")
+        setNeedsReview(null)
 
         loadTransactions(
             { categoryId: categoryFromQuery },
@@ -52,13 +54,12 @@ function TransactionsPage({
         setTransactionType,
         setAccountId,
         setDescriptionSearch,
+        setNeedsReview,
         loadTransactions
     ])
 
     return (
-        <div>
-            <h1>Transactions</h1>
-
+        <div className="transactions-page">
             <TransactionsSection
                 {...props}
                 categoryId={categoryId}
@@ -70,6 +71,7 @@ function TransactionsPage({
                 setTransactionType={setTransactionType}
                 setAccountId={setAccountId}
                 setDescriptionSearch={setDescriptionSearch}
+                setNeedsReview={setNeedsReview}
                 loadTransactions={loadTransactions}
                 drilldownCategoryId={categoryFromQuery}
             />

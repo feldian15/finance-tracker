@@ -78,6 +78,18 @@ def ensure_category_target_amount_column(engine):
             text("ALTER TABLE categories ADD COLUMN target_amount FLOAT")
         )
 
+
+def ensure_transaction_needs_review_column(engine):
+    columns = inspect(engine).get_columns("transactions")
+
+    if any(column["name"] == "needs_review" for column in columns):
+        return
+
+    with engine.begin() as conn:
+        conn.execute(
+            text("ALTER TABLE transactions ADD COLUMN needs_review BOOLEAN NOT NULL DEFAULT 0")
+        )
+
 def encrypt_token(token: str) -> str:
     return fernet.encrypt(token.encode()).decode()
 
@@ -189,7 +201,8 @@ def import_transactions_from_plaid(rows, db):
     created = 0
     error = 0
     pending = 0
-    duplicates = []
+    flagged = 0
+    skipped = 0
 
     rules = db.query(models.CategoryRule).all()
     
@@ -247,13 +260,16 @@ def import_transactions_from_plaid(rows, db):
             duplicate = db.query(models.Transaction).filter(models.Transaction.plaid_transaction_id == txn.transaction_id).first()
 
             if duplicate:
-                duplicates.append(new_txn)
+                skipped += 1
                 continue
 
             duplicate = is_duplicate(db, new_txn)
 
             if duplicate:
-                duplicates.append(new_txn)
+                new_txn.needs_review = True
+                db.add(new_txn)
+                created += 1
+                flagged += 1
                 continue
 
             db.add(new_txn)
@@ -266,19 +282,18 @@ def import_transactions_from_plaid(rows, db):
 
     return {
         "created": created, 
-        "dups": len(duplicates), 
+        "dups": flagged + skipped,
+        "flagged": flagged,
+        "skipped": skipped,
         "errors": error,
-        "dup_list": duplicates,
         "pending": pending
     }
 
 
 def import_transactions_from_csv(rows, account_id, rules, db):
     created = 0
-    duplicate = 0
+    flagged = 0
     error = 0
-
-    duplicates = []
 
     for row in rows:
         try:
@@ -314,9 +329,8 @@ def import_transactions_from_csv(rows, account_id, rules, db):
             )
 
             if is_duplicate(db, txn_in):
-                duplicates.append(txn_in)
-                duplicate += 1
-                continue
+                txn.needs_review = True
+                flagged += 1
 
             db.add(txn)
             created += 1
@@ -326,10 +340,10 @@ def import_transactions_from_csv(rows, account_id, rules, db):
             error += 1
             continue
 
-    return {"transactions_created": created, 
-            "duplicate_transactions_skipped": duplicate, 
+    return {"transactions_created": created,
+            "duplicate_transactions_flagged": flagged,
             "invalid_transactions": error,
-            "duplicate_transaction_list": duplicates}
+            "duplicate_transaction_list": []}
 
 
 # parse important fields from csv record
@@ -553,7 +567,8 @@ def create_transaction(db, txn_data):
             new_txn.category.name
             if new_txn.category else None
         ),
-        "transaction_type": new_txn.transaction_type
+        "transaction_type": new_txn.transaction_type,
+        "needs_review": new_txn.needs_review
     }
 
 
@@ -607,7 +622,8 @@ def update_transaction(db, transaction_id, updates):
             txn.category.name
             if txn.category else None
         ),
-        "transaction_type": txn.transaction_type
+        "transaction_type": txn.transaction_type,
+        "needs_review": txn.needs_review
     }
 
 

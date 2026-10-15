@@ -56,6 +56,14 @@ Whether a category's actual amount is better or worse than its expected amount f
 
 An imported transaction that matches an existing transaction according to heuristic duplicate-detection rules, such as matching account, date, amount, and description, and is imported with a review flag instead of being silently discarded. A repeated Plaid transaction ID is treated as an exact source duplicate and remains suppressed. Duplicate candidates may come from Plaid or CSV imports.
 
+## Exact Source Duplicate
+
+An imported Plaid transaction whose Plaid transaction ID already exists locally. Exact source duplicates are suppressed because the source identifies them as the same transaction.
+
+## Heuristic Duplicate
+
+An imported transaction that matches an existing transaction by account, date, amount, and normalized description without necessarily sharing the same source identifier. Heuristic duplicates are imported as Duplicate Candidates so they can be reviewed.
+
 ## Needs Review
 
 A transaction marker indicating that the transaction requires explicit user confirmation before its duplicate alert is resolved. A transaction marked **Needs Review** still participates in balances and reports; marking it correct clears the marker, while editing alone does not.

@@ -19,6 +19,7 @@ from plaid.exceptions import ApiException
 
 models.Base.metadata.create_all(bind=engine)
 services.ensure_category_target_amount_column(engine)
+services.ensure_transaction_needs_review_column(engine)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -87,6 +88,7 @@ def get_transactions(
         category_id: str | None = None,
         account_id: str | None = None,
         description: str | None = None,
+        needs_review: bool | None = None,
         db: Session = Depends(get_db)
     ):
 
@@ -113,6 +115,8 @@ def get_transactions(
         query = query.filter(models.Transaction.account_id == account_id)
     if description:
         query = query.filter(models.Transaction.description.ilike(f"%{description}%"))
+    if needs_review is not None:
+        query = query.filter(models.Transaction.needs_review == needs_review)
 
     txns = query.all()
 
@@ -129,7 +133,8 @@ def get_transactions(
             "date": t.date,
             "category_id": t.category_id,
             "category_name": t.category.name if t.category else None,
-            "transaction_type": t.transaction_type
+            "transaction_type": t.transaction_type,
+            "needs_review": t.needs_review
         }
         for t in txns
     ]
@@ -563,7 +568,8 @@ def sync_transactions(item_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="PlaidItem not found")
 
     total_added = 0
-    total_duplicates = 0
+    total_flagged = 0
+    total_skipped = 0
     total_errors = 0
     total_pending = 0
     has_more = True
@@ -574,7 +580,8 @@ def sync_transactions(item_id: str, db: Session = Depends(get_db)):
             
             created = services.import_transactions_from_plaid(result["added"], db)
             total_added += created["created"]
-            total_duplicates += created["dups"]
+            total_flagged += created["flagged"]
+            total_skipped += created["skipped"]
             total_errors += created["errors"]
             total_pending += created["pending"]
 
@@ -597,7 +604,8 @@ def sync_transactions(item_id: str, db: Session = Depends(get_db)):
 
     return {
         "transactions_created": total_added,
-        "duplicate_transactions_skipped": total_duplicates,
+        "duplicate_transactions_flagged": total_flagged,
+        "duplicate_transactions_skipped": total_skipped,
         "invalid_transactions": total_errors,
         "pending_transactions_skipped": total_pending 
     }
