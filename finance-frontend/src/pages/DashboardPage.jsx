@@ -1090,10 +1090,10 @@ function DashboardPage({
                                 <thead>
                                     <tr>
                                         <th>Category</th>
-                                        <th>Average Monthly</th>
-                                        <th>Actual</th>
-                                        <th>Expected</th>
-                                        <th>Diff</th>
+                                        <th>Total Actual</th>
+                                        <th>Monthly Average</th>
+                                        <th>Expected Monthly Average</th>
+                                        <th>Monthly Average Difference</th>
                                         <th>% of Income</th>
                                     </tr>
                                 </thead>
@@ -1112,10 +1112,10 @@ function DashboardPage({
                                             {section.categories.map((category) => {
                                                 const expected = category.target_amount === null || category.target_amount === undefined
                                                     ? null
-                                                    : Number(category.target_amount) * Number(categorySpending.months || 1)
+                                                    : Number(category.target_amount)
                                                 const diff = expected === null
                                                     ? null
-                                                    : Number(category.total) - expected
+                                                    : Number(category.avg_total) - expected
                                                 const diffPercent = expected
                                                     ? (diff / expected) * 100
                                                     : null
@@ -1135,8 +1135,8 @@ function DashboardPage({
                                                         role="link"
                                                     >
                                                         <td>{category.category_name}</td>
-                                                        <td>{formatMoney(category.avg_total)}</td>
                                                         <td>{formatMoney(category.total)}</td>
+                                                        <td>{formatMoney(category.avg_total)}</td>
                                                         <td>{formatMoney(expected)}</td>
                                                         <td
                                                             className="diff-cell"
