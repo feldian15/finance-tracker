@@ -83,6 +83,10 @@ function TransactionsSection({
         }
     })
 
+    const sortedCategories = [...categories].sort((a, b) =>
+        a.name.localeCompare(b.name)
+    )
+
     async function saveEdit(txnId) {
         try {
 
@@ -197,7 +201,7 @@ function TransactionsSection({
                     All Categories
                 </option>
 
-                {categories.map((cat) => (
+                {sortedCategories.map((cat) => (
                     <option
                         key={cat.id}
                         value={cat.id}
@@ -392,7 +396,7 @@ function TransactionsSection({
                                                 Unassigned
                                             </option>
 
-                                            {categories.map((cat) => (
+                                            {sortedCategories.map((cat) => (
                                                 <option
                                                     key={cat.id}
                                                     value={cat.id}
@@ -542,7 +546,7 @@ function TransactionsSection({
                     Unassigned
                 </option>
 
-                {categories.map((cat) => (
+                {sortedCategories.map((cat) => (
                     <option
                         key={cat.id}
                         value={cat.id}

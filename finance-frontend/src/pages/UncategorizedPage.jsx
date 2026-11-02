@@ -14,6 +14,9 @@ function UncategorizedPage() {
     const [categories, setCategories] = useState([])
     const [selectedCategories, setSelectedCategories] = useState({})
     const [createRuleFlags, setCreateRuleFlags] = useState({})
+    const sortedCategories = [...categories].sort((a, b) =>
+        a.name.localeCompare(b.name)
+    )
 
 
     async function loadTransactions() {
@@ -189,7 +192,7 @@ function UncategorizedPage() {
                                         Select Category
                                     </option>
 
-                                    {categories.map((cat) => (
+                                    {sortedCategories.map((cat) => (
 
                                         <option
                                             key={cat.id}

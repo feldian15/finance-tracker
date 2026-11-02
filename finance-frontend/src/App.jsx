@@ -2,7 +2,8 @@ import {
     BrowserRouter,
     Routes,
     Route,
-    Link
+    Link,
+    useLocation
 } from "react-router-dom"
 
 import { useCallback, useEffect, useState } from "react"
@@ -34,6 +35,16 @@ import TransactionsPage from "./pages/TransactionsPage"
 import CategoriesRulesPage from "./pages/CategoriesRulesPage"
 import ImportPage from "./pages/ImportPage"
 import DashboardPage from "./pages/DashboardPage"
+
+function RefreshOnNavigation({ refreshLatestData }) {
+    const location = useLocation()
+
+    useEffect(() => {
+        refreshLatestData()
+    }, [location.key, refreshLatestData])
+
+    return null
+}
 
 function App() {
 
@@ -170,7 +181,7 @@ function App() {
         }
     }
 
-    async function loadCategories() {
+    const loadCategories = useCallback(async () => {
 
         try {
             const data = await fetchCategories()
@@ -179,9 +190,9 @@ function App() {
         } catch (error) {
             console.error(error)
         }
-    }
+    }, [])
 
-    async function loadAccounts() {
+    const loadAccounts = useCallback(async () => {
 
         try {
             const accountsData = await fetchAccounts()
@@ -210,22 +221,10 @@ function App() {
         } catch (error) {
             console.error(error)
         }
-    }
-
-    useEffect(() => {
-        async function loadInitialData() {
-            await clearFilters()
-            await loadCategories()
-            await loadAccounts()
-            await loadRules()
-            await loadUncategorizedCount()
-        }
-
-        loadInitialData()
     }, [])
 
 
-    async function loadRules() {
+    const loadRules = useCallback(async () => {
 
         try {
 
@@ -236,22 +235,39 @@ function App() {
         } catch (error) {
             console.error(error)
         }
-    }
+    }, [])
 
-    async function loadUncategorizedCount() {
+    const loadUncategorizedCount = useCallback(async () => {
         try {
             const data = await fetchUncategorizedTransactions()
             setUncategorizedCount(data.length)
         } catch (error) {
             console.error(error)
         }
-    }
+    }, [])
+
+    const refreshLatestData = useCallback(async () => {
+        await Promise.all([
+            loadTransactions(),
+            loadCategories(),
+            loadAccounts(),
+            loadRules(),
+            loadUncategorizedCount()
+        ])
+    }, [
+        loadTransactions,
+        loadCategories,
+        loadAccounts,
+        loadRules,
+        loadUncategorizedCount
+    ])
 
 
     return (
         <>
             <Toaster position="top-right" />
             <BrowserRouter>
+                <RefreshOnNavigation refreshLatestData={refreshLatestData} />
 
                 <nav className="app-nav">
                     <Link to="/">
